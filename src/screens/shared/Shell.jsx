@@ -4,6 +4,35 @@ import {
   BarChart3, LineChart, Target, LogOut, Bell,
 } from "lucide-react";
 import { supabase } from "../../data/supabaseClient.js";
+import { useAuth } from "../../data/AuthContext.jsx";
+
+function iniciais(nome) {
+  return nome.trim().slice(0, 2).toUpperCase();
+}
+
+function UserBadge() {
+  const { session } = useAuth();
+  const user = session?.user;
+  if (!user) return null;
+  const nome = user.user_metadata?.full_name || user.email;
+  const foto = user.user_metadata?.avatar_url;
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 12px 8px", padding: "10px 8px", borderRadius: 8, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+      {foto ? (
+        <img src={foto} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+      ) : (
+        <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--sidebar-active-bg)", color: "var(--sidebar-active)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+          {iniciais(nome)}
+        </div>
+      )}
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nome}</div>
+        <div style={{ fontSize: 11, color: "var(--sidebar-ink-faint)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.email}</div>
+      </div>
+    </div>
+  );
+}
 
 const ABAS = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -49,6 +78,8 @@ function Sidebar() {
           );
         })}
       </nav>
+
+      <UserBadge />
 
       <button
         onClick={() => supabase.auth.signOut()}
