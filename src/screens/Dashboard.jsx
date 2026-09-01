@@ -11,11 +11,14 @@ function mesDe(dataISO) {
   return dataISO.slice(0, 7);
 }
 
+const selectStyle = { padding: "6px 10px", border: "1px solid var(--rule)", borderRadius: 8, fontSize: 13, background: "var(--panel)" };
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [transacoes, setTransacoes] = useState(null);
   const [categoriasMap, setCategoriasMap] = useState(null);
   const [erro, setErro] = useState("");
+  const [mesSelecionado, setMesSelecionado] = useState("");
 
   useEffect(() => {
     Promise.all([loadTransacoes(), getCategoriasMap()])
@@ -30,8 +33,8 @@ export default function Dashboard() {
     return [...new Set(transacoes.map((t) => mesDe(t.data)))].sort();
   }, [pronto, transacoes]);
 
-  const mesAtual = meses[meses.length - 1];
-  const mesAnterior = meses[meses.length - 2];
+  const mesAtual = mesSelecionado && meses.includes(mesSelecionado) ? mesSelecionado : meses[meses.length - 1];
+  const mesAnterior = meses[meses.indexOf(mesAtual) - 1];
 
   const agAtual = useMemo(() => {
     if (!pronto || !mesAtual) return null;
@@ -55,7 +58,9 @@ export default function Dashboard() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <p style={{ color: "var(--ink-faint)", fontSize: 13, margin: 0 }}>{labelMes(mesAtual)}</p>
+      <select value={mesAtual} onChange={(e) => setMesSelecionado(e.target.value)} style={{ ...selectStyle, alignSelf: "flex-start" }}>
+        {[...meses].reverse().map((m) => <option key={m} value={m}>{labelMes(m)}</option>)}
+      </select>
 
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
         <StatCard icon={TrendingUp} cor="green" rotulo="Receita" valor={brl(agAtual.receita)} onClick={() => navigate(`/receitas-despesas?mes=${mesAtual}&tipo=receita`)} />
