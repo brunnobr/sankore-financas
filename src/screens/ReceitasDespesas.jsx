@@ -1,21 +1,36 @@
 import { useEffect, useMemo, useState } from "react";
-import { loadTransacoes } from "../data/transactions.js";
+import { loadTransacoes, atualizarCategoriaTransacao } from "../data/transactions.js";
+import { getCategoriasMap } from "../data/settings.js";
 import { brl, formatarDataBR } from "../lib/finance/format.js";
 import { Panel } from "./shared/ui.jsx";
 
 const selectStyle = { padding: 8, border: "1px solid var(--rule)", borderRadius: 8, fontSize: 13, background: "var(--panel)" };
+const selectCatStyle = { padding: "4px 6px", border: "1px solid var(--rule)", borderRadius: 6, fontSize: 13, background: "var(--panel)", color: "var(--ink-faint)" };
 
 export default function ReceitasDespesas() {
   const [transacoes, setTransacoes] = useState(null);
+  const [categoriasMap, setCategoriasMap] = useState(null);
   const [erro, setErro] = useState("");
   const [filtroCategoria, setFiltroCategoria] = useState("");
   const [filtroBanco, setFiltroBanco] = useState("");
   const [filtroMes, setFiltroMes] = useState("");
 
   useEffect(() => {
-    loadTransacoes().then(setTransacoes).catch((e) => setErro(e.message));
+    Promise.all([loadTransacoes(), getCategoriasMap()])
+      .then(([t, c]) => { setTransacoes(t); setCategoriasMap(c); })
+      .catch((e) => setErro(e.message));
   }, []);
 
+  async function onMudarCategoria(id, novaCategoria) {
+    setTransacoes((prev) => prev.map((t) => (t.id === id ? { ...t, cat: novaCategoria } : t)));
+    try {
+      await atualizarCategoriaTransacao(id, novaCategoria);
+    } catch (e) {
+      setErro(e.message || "Erro ao atualizar categoria.");
+    }
+  }
+
+  const categoriasDisponiveis = useMemo(() => (categoriasMap ? Object.keys(categoriasMap).sort() : []), [categoriasMap]);
   const categorias = useMemo(() => transacoes ? [...new Set(transacoes.map((t) => t.cat))].sort() : [], [transacoes]);
   const bancos = useMemo(() => transacoes ? [...new Set(transacoes.map((t) => t.banco).filter(Boolean))].sort() : [], [transacoes]);
   const meses = useMemo(() => transacoes ? [...new Set(transacoes.map((t) => t.data.slice(0, 7)))].sort().reverse() : [], [transacoes]);
@@ -32,7 +47,7 @@ export default function ReceitasDespesas() {
   const total = filtradas.reduce((s, t) => s + t.valor, 0);
 
   if (erro) return <p style={{ color: "var(--debit)" }}>{erro}</p>;
-  if (!transacoes) return <p style={{ color: "var(--ink-faint)" }}>Carregando…</p>;
+  if (!transacoes || !categoriasMap) return <p style={{ color: "var(--ink-faint)" }}>Carregando…</p>;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -71,7 +86,12 @@ export default function ReceitasDespesas() {
                   <tr key={t.id} style={{ borderBottom: "1px solid var(--rule)" }}>
                     <td style={{ padding: "8px 4px", whiteSpace: "nowrap" }}>{formatarDataBR(t.data)}</td>
                     <td style={{ padding: "8px 4px" }}>{t.desc}</td>
-                    <td style={{ padding: "8px 4px", color: "var(--ink-faint)" }}>{t.cat}</td>
+                    <td style={{ padding: "8px 4px" }}>
+                      <select value={t.cat} onChange={(e) => onMudarCategoria(t.id, e.target.value)} style={selectCatStyle}>
+                        {!categoriasDisponiveis.includes(t.cat) && <option value={t.cat}>{t.cat}</option>}
+                        {categoriasDisponiveis.map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </td>
                     <td style={{ padding: "8px 4px", color: "var(--ink-faint)" }}>{t.banco}</td>
                     <td style={{ padding: "8px 4px", textAlign: "right", color: t.valor >= 0 ? "var(--credit)" : "var(--debit)", whiteSpace: "nowrap" }}>{brl(t.valor)}</td>
                   </tr>

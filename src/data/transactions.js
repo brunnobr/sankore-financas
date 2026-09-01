@@ -87,3 +87,11 @@ export async function loadTransacoes({ de, ate } = {}) {
   if (error) throw error;
   return data.map((t) => ({ data: t.data, desc: t.descricao, cat: t.categoria, banco: t.banco, valor: Number(t.valor), id: t.id }));
 }
+
+/* Recategorizar depois de já importado — não mexe em hash_dedup nem em
+   mais nada, só corrige a categoria daquela linha. */
+export async function atualizarCategoriaTransacao(id, categoria) {
+  const userId = await uid();
+  const { error } = await supabase.from("transactions").update({ categoria }).eq("id", id).eq("user_id", userId);
+  if (error) throw error;
+}
