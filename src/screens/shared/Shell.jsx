@@ -36,8 +36,8 @@ function UserBadge() {
 
 const ABAS = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
-  { path: "/investimentos", label: "Investimentos", icon: TrendingUp },
   { path: "/receitas-despesas", label: "Receitas/Despesas", icon: ArrowLeftRight },
+  { path: "/investimentos", label: "Investimentos", icon: TrendingUp },
   { path: "/importar", label: "Importar", icon: FileText },
   { path: "/cartao", label: "Cartão", icon: CreditCard },
   { path: "/notas", label: "Notas/MEI", icon: FileText },
@@ -51,9 +51,9 @@ function Sidebar() {
   return (
     <aside style={{ width: 232, background: "var(--sidebar-bg)", color: "var(--sidebar-ink)", display: "flex", flexDirection: "column", flexShrink: 0, height: "100vh", position: "sticky", top: 0 }}>
       <div style={{ padding: "22px 20px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: "#fff", letterSpacing: 0.3 }}>
+        <a href="/" style={{ fontSize: 16, fontWeight: 700, color: "#fff", letterSpacing: 0.3, textDecoration: "none", cursor: "pointer" }}>
           SANKORE <span style={{ color: "var(--sidebar-active)" }}>FINANÇAS</span>
-        </div>
+        </a>
       </div>
 
       <nav style={{ flex: 1, padding: "12px 12px", display: "flex", flexDirection: "column", gap: 2, overflowY: "auto" }}>

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Wallet, TrendingUp, TrendingDown, PiggyBank } from "lucide-react";
 import { loadTransacoes } from "../data/transactions.js";
 import { getCategoriasMap } from "../data/settings.js";
-import { agregarTx, categoriasDespesa, avaliarGastos } from "../lib/finance/categorization.js";
+import { agregarTx, categoriasDespesa, categoriasReceita, avaliarGastos } from "../lib/finance/categorization.js";
 import { brl, labelMes } from "../lib/finance/format.js";
 import { Panel, StatCard } from "./shared/ui.jsx";
 
@@ -44,6 +44,7 @@ export default function Dashboard() {
   }, [pronto, transacoes, categoriasMap, mesAnterior]);
 
   const despesasPorCategoria = agAtual ? categoriasDespesa(agAtual, categoriasMap) : [];
+  const receitasPorCategoria = agAtual ? categoriasReceita(agAtual, categoriasMap) : [];
   const insights = agAtual ? avaliarGastos(agAtual, agAnterior, categoriasMap) : [];
 
   if (erro) return <p style={{ color: "var(--debit)" }}>{erro}</p>;
@@ -79,21 +80,39 @@ export default function Dashboard() {
         </Panel>
       )}
 
-      <Panel title="Despesas por categoria">
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-          <tbody>
-            {despesasPorCategoria.map((c) => (
-              <tr key={c.cat} style={{ borderBottom: "1px solid var(--rule)" }}>
-                <td style={{ padding: "8px 4px" }}>
-                  <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, background: c.cor, marginRight: 8 }} />
-                  {c.cat}
-                </td>
-                <td style={{ padding: "8px 4px", textAlign: "right" }}>{brl(c.valor)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Panel>
+      <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+        <Panel title="Receitas por categoria" style={{ flex: 1, minWidth: 300 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <tbody>
+              {receitasPorCategoria.map((c) => (
+                <tr key={c.cat} style={{ borderBottom: "1px solid var(--rule)" }}>
+                  <td style={{ padding: "8px 4px" }}>
+                    <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, background: c.cor, marginRight: 8 }} />
+                    {c.cat}
+                  </td>
+                  <td style={{ padding: "8px 4px", textAlign: "right" }}>{brl(c.valor)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Panel>
+
+        <Panel title="Despesas por categoria" style={{ flex: 1, minWidth: 300 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <tbody>
+              {despesasPorCategoria.map((c) => (
+                <tr key={c.cat} style={{ borderBottom: "1px solid var(--rule)" }}>
+                  <td style={{ padding: "8px 4px" }}>
+                    <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, background: c.cor, marginRight: 8 }} />
+                    {c.cat}
+                  </td>
+                  <td style={{ padding: "8px 4px", textAlign: "right" }}>{brl(c.valor)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Panel>
+      </div>
     </div>
   );
 }
