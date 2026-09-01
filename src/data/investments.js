@@ -53,6 +53,18 @@ export async function loadMonths() {
   return months;
 }
 
+/* Atualização manual de saldo de um ativo (Banco Inter, cripto, cofrinhos —
+   qualquer coisa sem extrato baixável: o usuário lê o valor de um print e
+   registra aqui). Upsert por (mês, ticker): reenviar o mesmo mês corrige
+   o valor em vez de duplicar. */
+export async function salvarSnapshotAtivo({ ticker, mes, valor }) {
+  const userId = await uid();
+  const { error } = await supabase
+    .from("asset_snapshots")
+    .upsert({ user_id: userId, month: mes, ticker, valor }, { onConflict: "user_id,month,ticker" });
+  if (error) throw error;
+}
+
 /* Migração única (Fase 1): grava mai/jun/jul-2026 + pendência BOVA11 (ago)
    a partir do registro-investimentos.md. Rodar uma vez, manualmente, não
    é chamada automaticamente em nenhum lugar do app. */
