@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Wallet, TrendingUp, TrendingDown, PiggyBank } from "lucide-react";
 import { loadTransacoes } from "../data/transactions.js";
 import { getCategoriasMap } from "../data/settings.js";
@@ -11,6 +12,7 @@ function mesDe(dataISO) {
 }
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [transacoes, setTransacoes] = useState(null);
   const [categoriasMap, setCategoriasMap] = useState(null);
   const [erro, setErro] = useState("");
@@ -55,9 +57,9 @@ export default function Dashboard() {
       <p style={{ color: "var(--ink-faint)", fontSize: 13, margin: 0 }}>{labelMes(mesAtual)}</p>
 
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-        <StatCard icon={TrendingUp} cor="green" rotulo="Receita" valor={brl(agAtual.receita)} />
-        <StatCard icon={TrendingDown} cor="red" rotulo="Despesa" valor={brl(agAtual.despesa)} />
-        <StatCard icon={Wallet} cor="blue" rotulo="Aporte" valor={brl(agAtual.aporte)} />
+        <StatCard icon={TrendingUp} cor="green" rotulo="Receita" valor={brl(agAtual.receita)} onClick={() => navigate(`/receitas-despesas?mes=${mesAtual}&tipo=receita`)} />
+        <StatCard icon={TrendingDown} cor="red" rotulo="Despesa" valor={brl(agAtual.despesa)} onClick={() => navigate(`/receitas-despesas?mes=${mesAtual}&tipo=despesa`)} />
+        <StatCard icon={Wallet} cor="blue" rotulo="Aporte" valor={brl(agAtual.aporte)} onClick={() => navigate(`/receitas-despesas?mes=${mesAtual}&tipo=aporte`)} />
         <StatCard
           icon={PiggyBank}
           cor={agAtual.sobra >= 0 ? "green" : "red"}

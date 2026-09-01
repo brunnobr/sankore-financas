@@ -18,10 +18,13 @@ export function Panel({ title, action, children, style }) {
 
 const CORES_ICONE = { green: "#16a34a", blue: "#2563eb", purple: "#7c3aed", red: "#dc2626", amber: "#d97706" };
 
-export function StatCard({ icon: Icon, cor = "green", rotulo, valor, variacao, sub }) {
+export function StatCard({ icon: Icon, cor = "green", rotulo, valor, variacao, sub, onClick }) {
   const corIcone = CORES_ICONE[cor] || CORES_ICONE.green;
   return (
-    <div style={{ background: "var(--panel)", border: "1px solid var(--rule)", borderRadius: "var(--radius)", boxShadow: "var(--shadow)", padding: 18, display: "flex", flexDirection: "column", gap: 12, minWidth: 200, flex: 1 }}>
+    <div
+      onClick={onClick}
+      style={{ background: "var(--panel)", border: "1px solid var(--rule)", borderRadius: "var(--radius)", boxShadow: "var(--shadow)", padding: 18, display: "flex", flexDirection: "column", gap: 12, minWidth: 200, flex: 1, cursor: onClick ? "pointer" : "default" }}
+    >
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{ width: 40, height: 40, borderRadius: 10, background: `${corIcone}1a`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           {Icon && <Icon size={20} color={corIcone} strokeWidth={2} />}

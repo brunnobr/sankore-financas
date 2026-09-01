@@ -62,6 +62,7 @@ export const CATEGORIAS_SEED = {
   "Lazer":            { cor: "#A37B3C", tipo: "despesa" },
   "Compras":          { cor: "#7B5C8A", tipo: "despesa" },
   "Investimentos":    { cor: "#186040", tipo: "aporte" },
+  "Resgate de investimentos": { cor: "#4B8064", tipo: "aporte" },
   "Cartão de crédito":{ cor: "#8E2721", tipo: "despesa" },
   "Impostos":         { cor: "#8E2721", tipo: "despesa" },
   "Seguro":           { cor: "#4A6B5C", tipo: "despesa" },

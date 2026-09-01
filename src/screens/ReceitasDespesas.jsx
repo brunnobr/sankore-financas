@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { loadTransacoes, atualizarCategoriaTransacao } from "../data/transactions.js";
 import { getCategoriasMap } from "../data/settings.js";
 import { brl, formatarDataBR } from "../lib/finance/format.js";
@@ -6,14 +7,17 @@ import { Panel } from "./shared/ui.jsx";
 
 const selectStyle = { padding: 8, border: "1px solid var(--rule)", borderRadius: 8, fontSize: 13, background: "var(--panel)" };
 const selectCatStyle = { padding: "4px 6px", border: "1px solid var(--rule)", borderRadius: 6, fontSize: 13, background: "var(--panel)", color: "var(--ink-faint)" };
+const TIPOS = { receita: "Receita", despesa: "Despesa", aporte: "Aporte" };
 
 export default function ReceitasDespesas() {
+  const [searchParams] = useSearchParams();
   const [transacoes, setTransacoes] = useState(null);
   const [categoriasMap, setCategoriasMap] = useState(null);
   const [erro, setErro] = useState("");
   const [filtroCategoria, setFiltroCategoria] = useState("");
   const [filtroBanco, setFiltroBanco] = useState("");
-  const [filtroMes, setFiltroMes] = useState("");
+  const [filtroMes, setFiltroMes] = useState(searchParams.get("mes") || "");
+  const [filtroTipo, setFiltroTipo] = useState(searchParams.get("tipo") || "");
 
   useEffect(() => {
     Promise.all([loadTransacoes(), getCategoriasMap()])
@@ -40,9 +44,10 @@ export default function ReceitasDespesas() {
     return transacoes.filter((t) =>
       (!filtroCategoria || t.cat === filtroCategoria) &&
       (!filtroBanco || t.banco === filtroBanco) &&
-      (!filtroMes || t.data.slice(0, 7) === filtroMes)
+      (!filtroMes || t.data.slice(0, 7) === filtroMes) &&
+      (!filtroTipo || (categoriasMap[t.cat]?.tipo || "despesa") === filtroTipo)
     );
-  }, [transacoes, filtroCategoria, filtroBanco, filtroMes]);
+  }, [transacoes, filtroCategoria, filtroBanco, filtroMes, filtroTipo, categoriasMap]);
 
   const total = filtradas.reduce((s, t) => s + t.valor, 0);
 
@@ -63,6 +68,10 @@ export default function ReceitasDespesas() {
         <select value={filtroBanco} onChange={(e) => setFiltroBanco(e.target.value)} style={selectStyle}>
           <option value="">Todos os bancos</option>
           {bancos.map((b) => <option key={b} value={b}>{b}</option>)}
+        </select>
+        <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)} style={selectStyle}>
+          <option value="">Receita, despesa e aporte</option>
+          {Object.entries(TIPOS).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
         </select>
       </div>
 
