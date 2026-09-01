@@ -45,6 +45,34 @@ export async function importarTransacoes(transacoes, bancoDefault) {
   return { importadas: data.length, duplicadas: linhas.length - data.length };
 }
 
+/* Checklist de extratos já importados — registrado a cada confirmação,
+   pra usuário ver de bate-pronto o que já subiu e não perder tempo
+   reimportando o mesmo arquivo. */
+export async function registrarImportLog({ banco, arquivoNome, competenciaInicio, competenciaFim, importadas, duplicadas }) {
+  const userId = await uid();
+  const { error } = await supabase.from("import_log").insert({
+    user_id: userId,
+    banco,
+    arquivo_nome: arquivoNome,
+    competencia_inicio: competenciaInicio,
+    competencia_fim: competenciaFim,
+    transacoes_importadas: importadas,
+    transacoes_duplicadas: duplicadas,
+  });
+  if (error) throw error;
+}
+
+export async function loadImportLog() {
+  const userId = await uid();
+  const { data, error } = await supabase
+    .from("import_log")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
 export async function loadTransacoes({ de, ate } = {}) {
   const userId = await uid();
   let q = supabase.from("transactions").select("*").eq("user_id", userId).order("data", { ascending: false });

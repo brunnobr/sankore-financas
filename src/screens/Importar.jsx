@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
+import { FileCheck2 } from "lucide-react";
 import { FONTES, parseArquivo } from "../lib/import/index.js";
-import { loadRegrasUsuario, salvarRegraCategorizacao, importarTransacoes } from "../data/transactions.js";
+import { loadRegrasUsuario, salvarRegraCategorizacao, importarTransacoes, registrarImportLog, loadImportLog } from "../data/transactions.js";
 import { getCategoriasMap, getPalavrasCategoria } from "../data/settings.js";
 import { normalizar, brl, formatarDataBR } from "../lib/finance/format.js";
 import { Panel } from "./shared/ui.jsx";
@@ -10,16 +11,23 @@ export default function Importar() {
   const [categoriasMap, setCategoriasMap] = useState(null);
   const [palavrasCategoria, setPalavrasCategoria] = useState(null);
   const [linhas, setLinhas] = useState(null);
+  const [nomeArquivo, setNomeArquivo] = useState("");
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
   const [resultado, setResultado] = useState(null);
+  const [log, setLog] = useState(null);
 
   useEffect(() => {
     Promise.all([getCategoriasMap(), getPalavrasCategoria()]).then(([c, p]) => {
       setCategoriasMap(c);
       setPalavrasCategoria(p);
     });
+    carregarLog();
   }, []);
+
+  function carregarLog() {
+    loadImportLog().then(setLog).catch(() => setLog([]));
+  }
 
   const categoriasDisponiveis = categoriasMap ? Object.keys(categoriasMap) : [];
 
@@ -34,6 +42,7 @@ export default function Importar() {
       const regras = await loadRegrasUsuario();
       const parsed = await parseArquivo(file, fonteId, palavrasCategoria, regras);
       setLinhas(parsed.map((t) => ({ ...t, incluir: true, sempreAssim: false })));
+      setNomeArquivo(file.name);
     } catch (e2) {
       setErro(`Não consegui ler esse arquivo: ${e2.message}`);
       setLinhas(null);
@@ -54,9 +63,20 @@ export default function Importar() {
       await Promise.all(
         incluidas.filter((l) => l.sempreAssim).map((l) => salvarRegraCategorizacao(normalizar(l.desc), l.cat))
       );
-      const r = await importarTransacoes(incluidas, FONTES.find((f) => f.id === fonteId).banco);
+      const banco = FONTES.find((f) => f.id === fonteId).banco;
+      const r = await importarTransacoes(incluidas, banco);
+      const datas = incluidas.map((l) => l.data).sort();
+      await registrarImportLog({
+        banco,
+        arquivoNome: nomeArquivo,
+        competenciaInicio: datas[0],
+        competenciaFim: datas[datas.length - 1],
+        importadas: r.importadas,
+        duplicadas: r.duplicadas,
+      });
       setResultado(r);
       setLinhas(null);
+      carregarLog();
     } catch (e2) {
       setErro(`Erro ao importar: ${e2.message}`);
     } finally {
@@ -67,6 +87,37 @@ export default function Importar() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 900 }}>
       <p style={{ color: "var(--ink-faint)", fontSize: 13, margin: 0 }}>Nada é gravado antes de você revisar e confirmar abaixo.</p>
+
+      {log && log.length > 0 && (
+        <Panel title="Extratos já importados">
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ textAlign: "left", borderBottom: "1px solid var(--rule)", color: "var(--ink-faint)" }}>
+                <th style={{ padding: "6px 4px" }}></th>
+                <th style={{ padding: "6px 4px" }}>Banco</th>
+                <th style={{ padding: "6px 4px" }}>Arquivo</th>
+                <th style={{ padding: "6px 4px" }}>Período</th>
+                <th style={{ padding: "6px 4px" }}>Importado em</th>
+                <th style={{ padding: "6px 4px", textAlign: "right" }}>Transações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {log.map((l) => (
+                <tr key={l.id} style={{ borderBottom: "1px solid var(--rule)" }}>
+                  <td style={{ padding: "8px 4px" }}><FileCheck2 size={15} color="var(--credit)" /></td>
+                  <td style={{ padding: "8px 4px" }}>{l.banco}</td>
+                  <td style={{ padding: "8px 4px", color: "var(--ink-faint)" }}>{l.arquivo_nome}</td>
+                  <td style={{ padding: "8px 4px", whiteSpace: "nowrap" }}>
+                    {l.competencia_inicio ? formatarDataBR(l.competencia_inicio) : "—"} a {l.competencia_fim ? formatarDataBR(l.competencia_fim) : "—"}
+                  </td>
+                  <td style={{ padding: "8px 4px", color: "var(--ink-faint)", whiteSpace: "nowrap" }}>{formatarDataBR(l.created_at.slice(0, 10))}</td>
+                  <td style={{ padding: "8px 4px", textAlign: "right" }}>{l.transacoes_importadas}{l.transacoes_duplicadas > 0 && <span style={{ color: "var(--ink-faint)" }}> (+{l.transacoes_duplicadas} já existiam)</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Panel>
+      )}
 
       <Panel>
         <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
