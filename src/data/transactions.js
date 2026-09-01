@@ -45,20 +45,24 @@ export async function importarTransacoes(transacoes, bancoDefault) {
   return { importadas: data.length, duplicadas: linhas.length - data.length };
 }
 
-/* Checklist de extratos já importados — registrado a cada confirmação,
-   pra usuário ver de bate-pronto o que já subiu e não perder tempo
-   reimportando o mesmo arquivo. */
-export async function registrarImportLog({ banco, arquivoNome, competenciaInicio, competenciaFim, importadas, duplicadas }) {
+/* Checklist de extratos já importados, por banco + mês — registrado a
+   cada confirmação (upsert: reimportar o mesmo banco/mês atualiza a
+   linha em vez de duplicar), pra responder de cara "o extrato de
+   agosto/2026 do Banrisul já foi importado?". */
+export async function registrarImportLog({ banco, arquivoNome, competencia, importadas, duplicadas }) {
   const userId = await uid();
-  const { error } = await supabase.from("import_log").insert({
-    user_id: userId,
-    banco,
-    arquivo_nome: arquivoNome,
-    competencia_inicio: competenciaInicio,
-    competencia_fim: competenciaFim,
-    transacoes_importadas: importadas,
-    transacoes_duplicadas: duplicadas,
-  });
+  const { error } = await supabase.from("import_log").upsert(
+    {
+      user_id: userId,
+      banco,
+      competencia,
+      arquivo_nome: arquivoNome,
+      transacoes_importadas: importadas,
+      transacoes_duplicadas: duplicadas,
+      created_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id,banco,competencia" }
+  );
   if (error) throw error;
 }
 
@@ -68,7 +72,8 @@ export async function loadImportLog() {
     .from("import_log")
     .select("*")
     .eq("user_id", userId)
-    .order("created_at", { ascending: false });
+    .order("competencia", { ascending: false })
+    .order("banco", { ascending: true });
   if (error) throw error;
   return data;
 }

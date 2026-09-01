@@ -1,17 +1,18 @@
--- Checklist de extratos já importados — evita reimportar (retrabalho),
--- não é proteção contra duplicata (isso já é feito por hash_dedup em
--- transactions). Rode isso uma vez no SQL Editor do Supabase.
+-- Checklist de extratos já importados, por banco + mês (competência) —
+-- responde "o extrato de agosto/2026 do Banrisul já foi importado?"
+-- de cara. Não é proteção contra duplicata (isso é hash_dedup em
+-- transactions) — é só pra não perder tempo reimportando à toa.
 
 create table import_log (
   id uuid primary key default uuid_generate_v4(),
   user_id uuid not null references auth.users(id) default auth.uid(),
   banco text not null,
+  competencia date not null,           -- primeiro dia do mês do extrato
   arquivo_nome text not null,
-  competencia_inicio date,
-  competencia_fim date,
   transacoes_importadas int not null default 0,
   transacoes_duplicadas int not null default 0,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  unique (user_id, banco, competencia)
 );
 
 alter table import_log enable row level security;

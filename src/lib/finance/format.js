@@ -8,8 +8,8 @@ export const labelMes = (ym) => { const [y, m] = ym.split("-"); return `${MESES_
 export const curtoMes = (ym) => labelMes(ym).slice(0, 3);
 export const formatarDataBR = (iso) => {
   if (!iso) return "—";
-  const [y, m] = iso.split("-");
-  return `${MESES_PT[parseInt(m, 10) - 1]}/${y}`;
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
 };
 
 export function normalizar(s) {

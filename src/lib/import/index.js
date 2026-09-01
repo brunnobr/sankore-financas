@@ -1,8 +1,8 @@
-/* Ponto único de entrada da importação de extratos — escolhe o parser
-   certo pela fonte selecionada pelo usuário no upload, filtra ruído
-   interno, sugere categoria e calcula o hash de dedup. Cada linha
-   resultante ainda passa pela fila de revisão antes de virar
-   transação de verdade (ver src/screens/Importar.jsx). */
+/* Ponto único de entrada da importação de extratos — detecta o banco
+   automaticamente pelo formato/conteúdo do arquivo (não pede pra
+   escolher antes), filtra ruído interno, sugere categoria e calcula o
+   hash de dedup. Cada linha resultante ainda passa pela fila de
+   revisão antes de virar transação de verdade (ver Importar.jsx). */
 import { extrairLinhasPdf } from "./pdfText.js";
 import { parseOFX } from "./parsers/ofx.js";
 import { parseBanrisul } from "./parsers/banrisul.js";
@@ -11,32 +11,49 @@ import { filtrarRuido } from "./filtros.js";
 import { categorizarPorPalavra, aplicarRegras, hashTransacao } from "../finance/categorization.js";
 
 export const FONTES = [
-  { id: "inter-ofx", label: "Banco Inter — extrato .ofx", banco: "Banco Inter", extensao: ".ofx" },
-  { id: "banrisul-pdf", label: "Banrisul — extrato PDF", banco: "Banrisul", extensao: ".pdf" },
-  { id: "mp-pdf", label: "Mercado Pago — extrato de conta PDF", banco: "Mercado Pago", extensao: ".pdf" },
+  { id: "inter-ofx", label: "Banco Inter", banco: "Banco Inter" },
+  { id: "banrisul-pdf", label: "Banrisul", banco: "Banrisul" },
+  { id: "mp-pdf", label: "Mercado Pago", banco: "Mercado Pago" },
 ];
 
-async function parseBruto(file, fonteId) {
-  if (fonteId === "inter-ofx") return parseOFX(await file.text());
-  const linhas = await extrairLinhasPdf(file);
-  if (fonteId === "banrisul-pdf") return parseBanrisul(linhas);
-  if (fonteId === "mp-pdf") return parseMercadoPagoConta(linhas);
-  throw new Error(`Fonte desconhecida: ${fonteId}`);
+/* Aceita .ofx e .pdf; dentro do PDF, reconhece o layout pela assinatura
+   de texto de cada banco. Formato novo ou não reconhecido -> erro
+   explicando o que é suportado hoje (não tenta "adivinhar" um extrato
+   desconhecido, nem lê print/imagem — só texto extraído de PDF/OFX). */
+async function detectarEParsear(file) {
+  const ext = file.name.split(".").pop().toLowerCase();
+
+  if (ext === "ofx") {
+    return { fonte: FONTES.find((f) => f.id === "inter-ofx"), brutas: parseOFX(await file.text()) };
+  }
+
+  if (ext === "pdf") {
+    const linhas = await extrairLinhasPdf(file);
+    if (linhas.some((l) => /^\+\+\s*MOVIMENTOS\s+[A-Z]{3}\/\d{4}/i.test(l))) {
+      return { fonte: FONTES.find((f) => f.id === "banrisul-pdf"), brutas: parseBanrisul(linhas) };
+    }
+    if (linhas.some((l) => /EXTRATO DE CONTA/i.test(l)) || linhas.some((l) => /^\d{2}-\d{2}-\d{4}\s+\d{6,}\s+R\$/.test(l))) {
+      return { fonte: FONTES.find((f) => f.id === "mp-pdf"), brutas: parseMercadoPagoConta(linhas) };
+    }
+    throw new Error("Não reconheci o layout desse PDF. Hoje eu leio extratos do Banrisul e do Mercado Pago — um banco novo precisa de um parser novo.");
+  }
+
+  throw new Error(`Formato .${ext} não suportado. Hoje aceito .ofx (Banco Inter) e .pdf (Banrisul, Mercado Pago).`);
 }
 
-/* Retorna as transações prontas para a fila de revisão: já filtradas,
-   categorizadas e com hash de dedup calculado. */
-export async function parseArquivo(file, fonteId, palavrasCategoria, regrasUsuario) {
-  const fonte = FONTES.find((f) => f.id === fonteId);
-  if (!fonte) throw new Error(`Fonte desconhecida: ${fonteId}`);
+/* Retorna { fonte, transacoes } — transações já filtradas, categorizadas
+   e com hash de dedup calculado, prontas pra fila de revisão. */
+export async function parseArquivo(file, palavrasCategoria, regrasUsuario) {
+  const { fonte, brutas } = await detectarEParsear(file);
 
-  const brutas = filtrarRuido(await parseBruto(file, fonteId)).map((t) => ({ ...t, banco: fonte.banco }));
   const comCategoriaSugerida = aplicarRegras(
-    brutas.map((t) => ({ ...t, cat: categorizarPorPalavra(t.desc, palavrasCategoria) })),
+    filtrarRuido(brutas).map((t) => ({ ...t, banco: fonte.banco, cat: categorizarPorPalavra(t.desc, palavrasCategoria) })),
     regrasUsuario
   );
 
-  return Promise.all(
+  const transacoes = await Promise.all(
     comCategoriaSugerida.map(async (t) => ({ ...t, hash: await hashTransacao(t) }))
   );
+
+  return { fonte, transacoes };
 }

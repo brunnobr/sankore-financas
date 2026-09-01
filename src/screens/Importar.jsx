@@ -1,16 +1,29 @@
 import { useEffect, useState } from "react";
-import { FileCheck2 } from "lucide-react";
-import { FONTES, parseArquivo } from "../lib/import/index.js";
+import { CheckCircle2 } from "lucide-react";
+import { parseArquivo } from "../lib/import/index.js";
 import { loadRegrasUsuario, salvarRegraCategorizacao, importarTransacoes, registrarImportLog, loadImportLog } from "../data/transactions.js";
 import { getCategoriasMap, getPalavrasCategoria } from "../data/settings.js";
-import { normalizar, brl, formatarDataBR } from "../lib/finance/format.js";
+import { normalizar, brl, formatarDataBR, labelMes } from "../lib/finance/format.js";
 import { Panel } from "./shared/ui.jsx";
 
+/* Mês mais frequente entre as datas — usado como "competência" do
+   extrato pro checklist (um extrato normalmente cobre um mês; se cruzar
+   virada de mês, o mês com mais lançamentos vence). */
+function competenciaDominante(datas) {
+  const contagem = {};
+  for (const d of datas) {
+    const ym = d.slice(0, 7);
+    contagem[ym] = (contagem[ym] || 0) + 1;
+  }
+  const [ym] = Object.entries(contagem).sort((a, b) => b[1] - a[1])[0];
+  return `${ym}-01`;
+}
+
 export default function Importar() {
-  const [fonteId, setFonteId] = useState(FONTES[0].id);
   const [categoriasMap, setCategoriasMap] = useState(null);
   const [palavrasCategoria, setPalavrasCategoria] = useState(null);
   const [linhas, setLinhas] = useState(null);
+  const [fonte, setFonte] = useState(null);
   const [nomeArquivo, setNomeArquivo] = useState("");
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
@@ -40,11 +53,12 @@ export default function Importar() {
     setCarregando(true);
     try {
       const regras = await loadRegrasUsuario();
-      const parsed = await parseArquivo(file, fonteId, palavrasCategoria, regras);
-      setLinhas(parsed.map((t) => ({ ...t, incluir: true, sempreAssim: false })));
+      const { fonte: fonteDetectada, transacoes } = await parseArquivo(file, palavrasCategoria, regras);
+      setFonte(fonteDetectada);
+      setLinhas(transacoes.map((t) => ({ ...t, incluir: true, sempreAssim: false })));
       setNomeArquivo(file.name);
     } catch (e2) {
-      setErro(`Não consegui ler esse arquivo: ${e2.message}`);
+      setErro(e2.message);
       setLinhas(null);
     } finally {
       setCarregando(false);
@@ -63,14 +77,11 @@ export default function Importar() {
       await Promise.all(
         incluidas.filter((l) => l.sempreAssim).map((l) => salvarRegraCategorizacao(normalizar(l.desc), l.cat))
       );
-      const banco = FONTES.find((f) => f.id === fonteId).banco;
-      const r = await importarTransacoes(incluidas, banco);
-      const datas = incluidas.map((l) => l.data).sort();
+      const r = await importarTransacoes(incluidas, fonte.banco);
       await registrarImportLog({
-        banco,
+        banco: fonte.banco,
         arquivoNome: nomeArquivo,
-        competenciaInicio: datas[0],
-        competenciaFim: datas[datas.length - 1],
+        competencia: competenciaDominante(incluidas.map((l) => l.data)),
         importadas: r.importadas,
         duplicadas: r.duplicadas,
       });
@@ -90,43 +101,26 @@ export default function Importar() {
 
       {log && log.length > 0 && (
         <Panel title="Extratos já importados">
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <thead>
-              <tr style={{ textAlign: "left", borderBottom: "1px solid var(--rule)", color: "var(--ink-faint)" }}>
-                <th style={{ padding: "6px 4px" }}></th>
-                <th style={{ padding: "6px 4px" }}>Banco</th>
-                <th style={{ padding: "6px 4px" }}>Arquivo</th>
-                <th style={{ padding: "6px 4px" }}>Período</th>
-                <th style={{ padding: "6px 4px" }}>Importado em</th>
-                <th style={{ padding: "6px 4px", textAlign: "right" }}>Transações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {log.map((l) => (
-                <tr key={l.id} style={{ borderBottom: "1px solid var(--rule)" }}>
-                  <td style={{ padding: "8px 4px" }}><FileCheck2 size={15} color="var(--credit)" /></td>
-                  <td style={{ padding: "8px 4px" }}>{l.banco}</td>
-                  <td style={{ padding: "8px 4px", color: "var(--ink-faint)" }}>{l.arquivo_nome}</td>
-                  <td style={{ padding: "8px 4px", whiteSpace: "nowrap" }}>
-                    {l.competencia_inicio ? formatarDataBR(l.competencia_inicio) : "—"} a {l.competencia_fim ? formatarDataBR(l.competencia_fim) : "—"}
-                  </td>
-                  <td style={{ padding: "8px 4px", color: "var(--ink-faint)", whiteSpace: "nowrap" }}>{formatarDataBR(l.created_at.slice(0, 10))}</td>
-                  <td style={{ padding: "8px 4px", textAlign: "right" }}>{l.transacoes_importadas}{l.transacoes_duplicadas > 0 && <span style={{ color: "var(--ink-faint)" }}> (+{l.transacoes_duplicadas} já existiam)</span>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {log.map((l) => (
+              <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 0", borderBottom: "1px solid var(--rule)" }}>
+                <CheckCircle2 size={16} color="var(--credit)" style={{ flexShrink: 0 }} />
+                <span style={{ fontWeight: 600 }}>{labelMes(l.competencia.slice(0, 7))}</span>
+                <span style={{ color: "var(--ink-faint)" }}>—</span>
+                <span>{l.banco}</span>
+                <span style={{ color: "var(--ink-faint)", marginLeft: "auto", textAlign: "right" }}>
+                  {l.transacoes_importadas} transação(ões) · importado em {formatarDataBR(l.created_at.slice(0, 10))}
+                </span>
+              </div>
+            ))}
+          </div>
         </Panel>
       )}
 
       <Panel>
         <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <select value={fonteId} onChange={(e) => setFonteId(e.target.value)} style={{ padding: 8, border: "1px solid var(--rule)", borderRadius: 8 }}>
-            {FONTES.map((f) => (
-              <option key={f.id} value={f.id}>{f.label}</option>
-            ))}
-          </select>
-          <input type="file" accept={FONTES.find((f) => f.id === fonteId)?.extensao} onChange={onArquivo} disabled={carregando} />
+          <input type="file" accept=".ofx,.pdf" onChange={onArquivo} disabled={carregando} />
+          <span style={{ fontSize: 12, color: "var(--ink-faint)" }}>Reconheço automaticamente Banco Inter (.ofx), Banrisul e Mercado Pago (.pdf).</span>
         </div>
 
         {erro && <p style={{ color: "var(--debit)", marginBottom: 0 }}>{erro}</p>}
@@ -141,7 +135,7 @@ export default function Importar() {
       </Panel>
 
       {linhas && (
-        <Panel title={`${linhas.length} linha(s) encontrada(s)`}>
+        <Panel title={`${fonte.label} — ${linhas.length} linha(s) encontrada(s)`}>
           <p style={{ fontSize: 13, color: "var(--ink-faint)", marginTop: -8, marginBottom: 12 }}>
             Desmarque o que não deve entrar, corrija a categoria onde fizer sentido, e confirme.
           </p>
