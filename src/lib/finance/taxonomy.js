@@ -71,6 +71,7 @@ export const CATEGORIAS_SEED = {
   "Transferências":   { cor: "#94826B", tipo: "despesa" },
   "Transferência entre contas": { cor: "#7A8B94", tipo: "despesa" },
   "Cashback":         { cor: "#2E8F5E", tipo: "receita" },
+  "Repasses de terceiros": { cor: "#6B7A94", tipo: "despesa" },
   "Vestuário":        { cor: "#7B5C6E", tipo: "despesa" },
   "Outros":           { cor: "#7B846F", tipo: "despesa" },
   "Salário":          { cor: "#186040", tipo: "receita" },
