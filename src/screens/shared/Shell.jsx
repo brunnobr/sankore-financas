@@ -84,7 +84,7 @@ function Sidebar() {
   const location = useLocation();
   return (
     <aside style={{ width: 232, background: "var(--sidebar-bg)", color: "var(--sidebar-ink)", display: "flex", flexDirection: "column", flexShrink: 0, height: "100vh", position: "sticky", top: 0 }}>
-      <div style={{ padding: "22px 20px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+      <div style={{ padding: "22px 20px", borderBottom: "1px solid var(--sidebar-rule)" }}>
         <a href="/" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 700, color: "#fff", letterSpacing: 0.3, textDecoration: "none", cursor: "pointer" }}>
           <img src={logoFinancas} alt="" style={{ width: 34, height: 34, borderRadius: 8, flexShrink: 0 }} />
           SANKORE <span style={{ color: "var(--sidebar-active)" }}>FINANÇAS</span>
@@ -114,7 +114,7 @@ function Sidebar() {
         })}
       </nav>
 
-      <div style={{ margin: "10px 12px 20px", paddingTop: 16, borderTop: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+      <div style={{ margin: "10px 12px 20px", paddingTop: 16, borderTop: "1px solid var(--sidebar-rule)", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
         <img src={logoLabs} alt="Sankoré Labs" style={{ width: 46, height: 46, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
         <span style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--sidebar-ink-faint)" }}>by Sankoré Labs</span>
       </div>
