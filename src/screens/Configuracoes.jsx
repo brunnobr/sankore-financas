@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
-import { Upload } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Upload } from "lucide-react";
 import { useAuth } from "../data/AuthContext.jsx";
 import { enviarFotoPerfil, removerFotoPerfil } from "../data/profile.js";
 import { Panel } from "./shared/ui.jsx";
@@ -12,6 +13,7 @@ const fieldStyle = { padding: "10px 12px", border: "1px solid var(--rule)", bord
 
 export default function Configuracoes() {
   const { session } = useAuth();
+  const navigate = useNavigate();
   const inputRef = useRef(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
@@ -50,9 +52,16 @@ export default function Configuracoes() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 560 }}>
+      <button
+        onClick={() => navigate(-1)}
+        style={{ alignSelf: "flex-start", display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", background: "transparent", border: "1px solid var(--rule)", borderRadius: 8, fontSize: 13, fontWeight: 600, color: "var(--ink-soft)", cursor: "pointer" }}
+      >
+        <ArrowLeft size={16} strokeWidth={2} /> Voltar
+      </button>
+
       <Panel title="Perfil">
-        <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 22 }}>
-          <div style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--sidebar-active-bg)", color: "var(--sidebar-active)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 22 }}>
+          <div style={{ width: 96, height: 96, borderRadius: "50%", background: "var(--sidebar-active-bg)", color: "var(--sidebar-active)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
             {foto ? <img src={foto} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : iniciais(nome)}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

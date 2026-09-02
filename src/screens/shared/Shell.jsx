@@ -38,13 +38,13 @@ function AccountMenu() {
     <div ref={ref} style={{ position: "relative" }}>
       <button
         onClick={() => setAberto((v) => !v)}
-        style={{ width: 34, height: 34, borderRadius: "50%", border: "2px solid #fff", boxShadow: "0 0 0 1px var(--rule)", background: "var(--sidebar-active-bg)", color: "var(--sidebar-active)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, cursor: "pointer", padding: 0, overflow: "hidden" }}
+        style={{ width: 44, height: 44, borderRadius: "50%", border: "2px solid #fff", boxShadow: "0 0 0 1px var(--rule)", background: "var(--sidebar-active-bg)", color: "var(--sidebar-active)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 700, cursor: "pointer", padding: 0, overflow: "hidden" }}
       >
         {foto ? <img src={foto} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : iniciais(nome)}
       </button>
 
       {aberto && (
-        <div style={{ position: "absolute", top: 44, right: 0, width: 210, background: "var(--panel)", border: "1px solid var(--rule)", borderRadius: 12, boxShadow: "0 4px 10px rgba(16,21,28,.06), 0 12px 28px rgba(16,21,28,.08)", padding: 8, zIndex: 20 }}>
+        <div style={{ position: "absolute", top: 54, right: 0, width: 210, background: "var(--panel)", border: "1px solid var(--rule)", borderRadius: 12, boxShadow: "0 4px 10px rgba(16,21,28,.06), 0 12px 28px rgba(16,21,28,.08)", padding: 8, zIndex: 20 }}>
           <div style={{ padding: "8px 10px 10px" }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nome}</div>
             <div style={{ fontSize: 11.5, color: "var(--ink-faint)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.email}</div>
@@ -86,7 +86,7 @@ function Sidebar() {
     <aside style={{ width: 232, background: "var(--sidebar-bg)", color: "var(--sidebar-ink)", display: "flex", flexDirection: "column", flexShrink: 0, height: "100vh", position: "sticky", top: 0 }}>
       <div style={{ padding: "22px 20px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
         <a href="/" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 700, color: "#fff", letterSpacing: 0.3, textDecoration: "none", cursor: "pointer" }}>
-          <img src={logoFinancas} alt="" style={{ width: 24, height: 24, borderRadius: 6, flexShrink: 0 }} />
+          <img src={logoFinancas} alt="" style={{ width: 34, height: 34, borderRadius: 8, flexShrink: 0 }} />
           SANKORE <span style={{ color: "var(--sidebar-active)" }}>FINANÇAS</span>
         </a>
       </div>
@@ -115,7 +115,7 @@ function Sidebar() {
       </nav>
 
       <div style={{ margin: "10px 12px 20px", paddingTop: 16, borderTop: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-        <img src={logoLabs} alt="Sankoré Labs" style={{ width: 30, height: 30, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+        <img src={logoLabs} alt="Sankoré Labs" style={{ width: 46, height: 46, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
         <span style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--sidebar-ink-faint)" }}>by Sankoré Labs</span>
       </div>
     </aside>
