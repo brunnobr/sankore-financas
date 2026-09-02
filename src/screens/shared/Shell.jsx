@@ -83,7 +83,7 @@ const ABAS = [
 function Sidebar() {
   const location = useLocation();
   return (
-    <aside style={{ width: 232, background: "var(--sidebar-bg)", color: "var(--sidebar-ink)", display: "flex", flexDirection: "column", flexShrink: 0, height: "100vh", position: "sticky", top: 0 }}>
+    <aside style={{ width: 268, background: "var(--sidebar-bg)", color: "var(--sidebar-ink)", display: "flex", flexDirection: "column", flexShrink: 0, height: "100vh", position: "sticky", top: 0 }}>
       <div style={{ padding: "22px 20px", borderBottom: "1px solid var(--sidebar-rule)" }}>
         <a href="/" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 700, color: "#fff", letterSpacing: 0.3, textDecoration: "none", cursor: "pointer" }}>
           <img src={logoFinancas} alt="" style={{ width: 34, height: 34, borderRadius: 8, flexShrink: 0 }} />
