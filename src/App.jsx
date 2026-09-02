@@ -7,12 +7,14 @@ import Dashboard from "./screens/Dashboard.jsx";
 import Investimentos from "./screens/Investimentos.jsx";
 import ReceitasDespesas from "./screens/ReceitasDespesas.jsx";
 import Importar from "./screens/Importar.jsx";
+import Configuracoes from "./screens/Configuracoes.jsx";
 
 const TITULOS = {
   "/": "Dashboard",
   "/investimentos": "Investimentos",
   "/receitas-despesas": "Receitas/Despesas",
   "/importar": "Importar extrato",
+  "/configuracoes": "Configurações",
   "/cartao": "Cartão",
   "/notas": "Notas/MEI",
   "/analytics": "Analytics",
@@ -48,6 +50,7 @@ function AppShell() {
         <Route path="/investimentos" element={<Pagina titulo={TITULOS["/investimentos"]}><Investimentos /></Pagina>} />
         <Route path="/receitas-despesas" element={<Pagina titulo={TITULOS["/receitas-despesas"]}><ReceitasDespesas /></Pagina>} />
         <Route path="/importar" element={<Pagina titulo={TITULOS["/importar"]}><Importar /></Pagina>} />
+        <Route path="/configuracoes" element={<Pagina titulo={TITULOS["/configuracoes"]}><Configuracoes /></Pagina>} />
         <Route path="/cartao" element={<Placeholder titulo="Cartão" />} />
         <Route path="/notas" element={<Placeholder titulo="Notas/MEI" />} />
         <Route path="/analytics" element={<Placeholder titulo="Analytics" />} />

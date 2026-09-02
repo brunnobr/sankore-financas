@@ -1,35 +1,69 @@
-import { Link, useLocation } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, TrendingUp, ArrowLeftRight, CreditCard, FileText,
-  BarChart3, LineChart, Target, LogOut, Bell,
+  BarChart3, LineChart, Target, LogOut, Bell, Settings,
 } from "lucide-react";
 import { supabase } from "../../data/supabaseClient.js";
 import { useAuth } from "../../data/AuthContext.jsx";
+import logoFinancas from "../../assets/logo-financas.png";
+import logoLabs from "../../assets/logo-labs.png";
 
 function iniciais(nome) {
   return nome.trim().slice(0, 2).toUpperCase();
 }
 
-function UserBadge() {
+/* Avatar clicável no topo direito — abre o menu de conta (Configurações,
+   Sair). Substitui o antigo bloco de usuário no rodapé da sidebar. */
+function AccountMenu() {
   const { session } = useAuth();
+  const navigate = useNavigate();
+  const [aberto, setAberto] = useState(false);
+  const ref = useRef(null);
   const user = session?.user;
+
+  useEffect(() => {
+    function onClickFora(e) {
+      if (ref.current && !ref.current.contains(e.target)) setAberto(false);
+    }
+    document.addEventListener("mousedown", onClickFora);
+    return () => document.removeEventListener("mousedown", onClickFora);
+  }, []);
+
   if (!user) return null;
   const nome = user.user_metadata?.full_name || user.email;
   const foto = user.user_metadata?.avatar_url;
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 12px 8px", padding: "10px 8px", borderRadius: 8, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-      {foto ? (
-        <img src={foto} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-      ) : (
-        <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--sidebar-active-bg)", color: "var(--sidebar-active)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
-          {iniciais(nome)}
+    <div ref={ref} style={{ position: "relative" }}>
+      <button
+        onClick={() => setAberto((v) => !v)}
+        style={{ width: 34, height: 34, borderRadius: "50%", border: "2px solid #fff", boxShadow: "0 0 0 1px var(--rule)", background: "var(--sidebar-active-bg)", color: "var(--sidebar-active)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, cursor: "pointer", padding: 0, overflow: "hidden" }}
+      >
+        {foto ? <img src={foto} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : iniciais(nome)}
+      </button>
+
+      {aberto && (
+        <div style={{ position: "absolute", top: 44, right: 0, width: 210, background: "var(--panel)", border: "1px solid var(--rule)", borderRadius: 12, boxShadow: "0 4px 10px rgba(16,21,28,.06), 0 12px 28px rgba(16,21,28,.08)", padding: 8, zIndex: 20 }}>
+          <div style={{ padding: "8px 10px 10px" }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nome}</div>
+            <div style={{ fontSize: 11.5, color: "var(--ink-faint)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.email}</div>
+          </div>
+          <div style={{ height: 1, background: "var(--rule)", margin: "2px 0 6px" }} />
+          <button
+            onClick={() => { setAberto(false); navigate("/configuracoes"); }}
+            style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, fontSize: 13, color: "var(--ink-soft)", background: "transparent", border: "none", cursor: "pointer", textAlign: "left" }}
+          >
+            <Settings size={16} strokeWidth={2} /> Configurações
+          </button>
+          <button
+            onClick={() => supabase.auth.signOut()}
+            style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, fontSize: 13, color: "var(--ink-soft)", background: "transparent", border: "none", cursor: "pointer", textAlign: "left" }}
+          >
+            <LogOut size={16} strokeWidth={2} /> Sair
+          </button>
         </div>
       )}
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nome}</div>
-        <div style={{ fontSize: 11, color: "var(--sidebar-ink-faint)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.email}</div>
-      </div>
     </div>
   );
 }
@@ -51,7 +85,8 @@ function Sidebar() {
   return (
     <aside style={{ width: 232, background: "var(--sidebar-bg)", color: "var(--sidebar-ink)", display: "flex", flexDirection: "column", flexShrink: 0, height: "100vh", position: "sticky", top: 0 }}>
       <div style={{ padding: "22px 20px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-        <a href="/" style={{ fontSize: 16, fontWeight: 700, color: "#fff", letterSpacing: 0.3, textDecoration: "none", cursor: "pointer" }}>
+        <a href="/" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 700, color: "#fff", letterSpacing: 0.3, textDecoration: "none", cursor: "pointer" }}>
+          <img src={logoFinancas} alt="" style={{ width: 24, height: 24, borderRadius: 6, flexShrink: 0 }} />
           SANKORE <span style={{ color: "var(--sidebar-active)" }}>FINANÇAS</span>
         </a>
       </div>
@@ -79,14 +114,10 @@ function Sidebar() {
         })}
       </nav>
 
-      <UserBadge />
-
-      <button
-        onClick={() => supabase.auth.signOut()}
-        style={{ margin: 12, padding: "9px 12px", background: "transparent", border: "none", color: "var(--sidebar-ink-faint)", display: "flex", alignItems: "center", gap: 10, fontSize: 13.5, cursor: "pointer", borderRadius: 8 }}
-      >
-        <LogOut size={17} strokeWidth={2} /> Sair
-      </button>
+      <div style={{ margin: "10px 12px 20px", paddingTop: 16, borderTop: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+        <img src={logoLabs} alt="Sankoré Labs" style={{ width: 30, height: 30, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+        <span style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--sidebar-ink-faint)" }}>by Sankoré Labs</span>
+      </div>
     </aside>
   );
 }
@@ -98,8 +129,9 @@ export function Topbar({ titulo, subtitulo }) {
         <h1 style={{ fontSize: 19, fontWeight: 700, margin: 0, color: "var(--ink)" }}>{titulo}</h1>
         {subtitulo && <p style={{ fontSize: 13, color: "var(--ink-faint)", margin: "2px 0 0" }}>{subtitulo}</p>}
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
         <Bell size={18} color="var(--ink-faint)" />
+        <AccountMenu />
       </div>
     </header>
   );
