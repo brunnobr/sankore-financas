@@ -5,12 +5,84 @@ import {
 } from "recharts";
 import { Landmark, PiggyBank, Wallet, Percent } from "lucide-react";
 import { loadMonths, salvarSnapshotAtivo } from "../data/investments.js";
-import { getAssetGroupMap, getAssetTipoMap } from "../data/settings.js";
+import { getAssetGroupMap, getAssetTipoMap, updateSetting } from "../data/settings.js";
+import { GRUPO, TIPO } from "../lib/finance/taxonomy.js";
 import {
   gruposDoMes, tiposDoMes, retornoMes, retornosPorAtivo, totalDoMes, investido, caixaDoMes,
 } from "../lib/finance/returns.js";
 import { brl, pct, labelMes } from "../lib/finance/format.js";
 import { Panel, StatCard } from "./shared/ui.jsx";
+
+const selectStyle = { padding: "6px 8px", border: "1px solid var(--rule)", borderRadius: 6, fontSize: 13, background: "var(--panel)" };
+
+/* Classificação de cada ativo por função (onde entra o aporte, ver
+   GRUPO) e tipo (composição da carteira, ver TIPO). Sem isso, um ativo
+   novo cai silenciosamente em "Congelado"/"Bond estruturado (USD)" —
+   aqui é onde você identifica de verdade cada investimento. */
+function GerenciarAtivos({ tickers, assetGroupMap, assetTipoMap, onAtualizado }) {
+  const [salvando, setSalvando] = useState(null);
+
+  async function alterar(chave, ticker, valor, mapaAtual) {
+    setSalvando(ticker);
+    const novo = { ...mapaAtual, [ticker]: valor };
+    try {
+      await updateSetting(chave, novo);
+      onAtualizado(chave, novo);
+    } finally {
+      setSalvando(null);
+    }
+  }
+
+  if (!tickers.length) return null;
+
+  return (
+    <Panel title="Meus ativos">
+      <p style={{ fontSize: 13, color: "var(--ink-faint)", marginTop: -8, marginBottom: 12 }}>
+        Classifique cada ativo por função (onde entra o aporte novo) e tipo (composição da carteira).
+      </p>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead>
+            <tr style={{ textAlign: "left", borderBottom: "1px solid var(--rule)", color: "var(--ink-faint)" }}>
+              <th style={{ padding: "6px 4px" }}>Ativo</th>
+              <th style={{ padding: "6px 4px" }}>Função</th>
+              <th style={{ padding: "6px 4px" }}>Tipo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tickers.map((t) => (
+              <tr key={t} style={{ borderBottom: "1px solid var(--rule)", opacity: salvando === t ? 0.6 : 1 }}>
+                <td style={{ padding: "8px 4px" }}>{t}</td>
+                <td style={{ padding: "8px 4px" }}>
+                  <select
+                    value={assetGroupMap[t] || ""}
+                    disabled={salvando === t}
+                    onChange={(e) => alterar("asset_group", t, e.target.value, assetGroupMap)}
+                    style={selectStyle}
+                  >
+                    <option value="" disabled>— classificar —</option>
+                    {Object.entries(GRUPO).map(([g, info]) => <option key={g} value={g}>{info.label}</option>)}
+                  </select>
+                </td>
+                <td style={{ padding: "8px 4px" }}>
+                  <select
+                    value={assetTipoMap[t] || ""}
+                    disabled={salvando === t}
+                    onChange={(e) => alterar("asset_tipo", t, e.target.value, assetTipoMap)}
+                    style={selectStyle}
+                  >
+                    <option value="" disabled>— classificar —</option>
+                    {Object.entries(TIPO).map(([ti, info]) => <option key={ti} value={ti}>{info.label}</option>)}
+                  </select>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Panel>
+  );
+}
 
 /* Ativo sem extrato baixável (Banco Inter, cripto, cofrinhos...): o
    usuário lê o saldo de um print e registra aqui — upsert por mês, então
@@ -116,12 +188,18 @@ export default function Investimentos() {
     return [...new Set(months.flatMap((m) => m.assets.map((a) => a.nome)))].sort();
   }, [pronto, months]);
 
+  function onAtualizadoClassificacao(chave, novo) {
+    if (chave === "asset_group") setAssetGroupMap(novo);
+    else setAssetTipoMap(novo);
+  }
+
   if (erro) return <p style={{ color: "var(--debit)" }}>{erro}</p>;
   if (!pronto) return <p style={{ color: "var(--ink-faint)" }}>Carregando…</p>;
   if (!latest) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         <Panel><p style={{ color: "var(--ink-faint)", margin: 0 }}>Nenhum fechamento de mês cadastrado ainda.</p></Panel>
+        <GerenciarAtivos tickers={tickers} assetGroupMap={assetGroupMap} assetTipoMap={assetTipoMap} onAtualizado={onAtualizadoClassificacao} />
         <AtualizarSaldoForm tickers={tickers} onSalvo={carregar} />
       </div>
     );
@@ -216,6 +294,8 @@ export default function Investimentos() {
         </table>
         </div>
       </Panel>
+
+      <GerenciarAtivos tickers={tickers} assetGroupMap={assetGroupMap} assetTipoMap={assetTipoMap} onAtualizado={onAtualizadoClassificacao} />
 
       <AtualizarSaldoForm tickers={tickers} onSalvo={carregar} />
     </div>
