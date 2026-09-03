@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { parseArquivo } from "../lib/import/index.js";
-import { loadRegrasUsuario, salvarRegraCategorizacao, importarTransacoes, registrarImportLog, loadImportLog } from "../data/transactions.js";
+import { loadRegrasUsuario, salvarRegraCategorizacao, importarTransacoes, registrarImportLog, loadImportLog, loadTransacoes } from "../data/transactions.js";
 import { getCategoriasMap, getPalavrasCategoria } from "../data/settings.js";
 import { normalizar, brl, formatarDataBR, labelMes } from "../lib/finance/format.js";
 import { Panel } from "./shared/ui.jsx";
@@ -9,6 +9,20 @@ import { Panel } from "./shared/ui.jsx";
 /* Mês mais frequente entre as datas — usado como "competência" do
    extrato pro checklist (um extrato normalmente cobre um mês; se cruzar
    virada de mês, o mês com mais lançamentos vence). */
+/* Agrupa as transações já gravadas por conta (banco) -> lista de meses
+   (YYYY-MM) com dados, pra responder "o que já foi importado em cada
+   conta" a partir do que realmente está no banco, não só do log de
+   importação. */
+function agruparPorConta(transacoes) {
+  const porBanco = {};
+  for (const t of transacoes) {
+    (porBanco[t.banco] ||= new Set()).add(t.data.slice(0, 7));
+  }
+  return Object.entries(porBanco)
+    .map(([banco, meses]) => ({ banco, meses: [...meses].sort() }))
+    .sort((a, b) => a.banco.localeCompare(b.banco));
+}
+
 function competenciaDominante(datas) {
   const contagem = {};
   for (const d of datas) {
@@ -29,6 +43,7 @@ export default function Importar() {
   const [erro, setErro] = useState("");
   const [resultado, setResultado] = useState(null);
   const [log, setLog] = useState(null);
+  const [porConta, setPorConta] = useState(null);
 
   useEffect(() => {
     Promise.all([getCategoriasMap(), getPalavrasCategoria()]).then(([c, p]) => {
@@ -36,10 +51,15 @@ export default function Importar() {
       setPalavrasCategoria(p);
     });
     carregarLog();
+    carregarPorConta();
   }, []);
 
   function carregarLog() {
     loadImportLog().then(setLog).catch(() => setLog([]));
+  }
+
+  function carregarPorConta() {
+    loadTransacoes().then((t) => setPorConta(agruparPorConta(t))).catch(() => setPorConta([]));
   }
 
   const categoriasDisponiveis = categoriasMap ? Object.keys(categoriasMap) : [];
@@ -88,6 +108,7 @@ export default function Importar() {
       setResultado(r);
       setLinhas(null);
       carregarLog();
+      carregarPorConta();
     } catch (e2) {
       setErro(`Erro ao importar: ${e2.message}`);
     } finally {
@@ -98,6 +119,28 @@ export default function Importar() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 900 }}>
       <p style={{ color: "var(--ink-faint)", fontSize: 13, margin: 0 }}>Nada é gravado antes de você revisar e confirmar abaixo.</p>
+
+      {porConta && porConta.length > 0 && (
+        <Panel title="Importado por conta">
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {porConta.map((c) => (
+              <div key={c.banco}>
+                <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 6 }}>{c.banco}</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {c.meses.map((m) => (
+                    <span
+                      key={m}
+                      style={{ padding: "4px 10px", background: "var(--sidebar-active-bg)", color: "var(--sidebar-active)", borderRadius: 999, fontSize: 12, fontWeight: 600 }}
+                    >
+                      {labelMes(m)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      )}
 
       {log && log.length > 0 && (
         <Panel title="Extratos já importados">
