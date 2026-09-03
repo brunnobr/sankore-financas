@@ -65,6 +65,18 @@ export async function salvarSnapshotAtivo({ ticker, mes, valor }) {
   if (error) throw error;
 }
 
+/* Sobe a captura de tela pra Edge Function (parse-investment-screenshot),
+   que chama a API da Claude e devolve [{nome, valor, moeda?}] — nada é
+   gravado aqui, só extraído; a revisão/gravação fica em
+   ImportarPrintForm (Investimentos.jsx), mesmo padrão de fila de
+   revisão do import de extrato. */
+export async function extrairSaldosDePrint(imagens) {
+  const { data, error } = await supabase.functions.invoke("parse-investment-screenshot", { body: { imagens } });
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
+  return data.itens || [];
+}
+
 /* Migração única (Fase 1): grava mai/jun/jul-2026 + pendência BOVA11 (ago)
    a partir do registro-investimentos.md. Rodar uma vez, manualmente, não
    é chamada automaticamente em nenhum lugar do app. */
