@@ -88,6 +88,18 @@ export async function loadTransacoes({ de, ate } = {}) {
   return data.map((t) => ({ data: t.data, desc: t.descricao, cat: t.categoria, banco: t.banco, valor: Number(t.valor), id: t.id }));
 }
 
+/* Renomeia uma conta (ex: "Banco Inter •7821" -> "Inter PF") em todas as
+   transações e no log de importação — não é um apelido só de exibição,
+   vira o valor real gravado, então filtros e agrupamentos por "banco"
+   continuam funcionando sem mudança. */
+export async function renomearConta(bancoAntigo, novoNome) {
+  const userId = await uid();
+  const { error: e1 } = await supabase.from("transactions").update({ banco: novoNome }).eq("user_id", userId).eq("banco", bancoAntigo);
+  if (e1) throw e1;
+  const { error: e2 } = await supabase.from("import_log").update({ banco: novoNome }).eq("user_id", userId).eq("banco", bancoAntigo);
+  if (e2) throw e2;
+}
+
 /* Recategorizar depois de já importado — não mexe em hash_dedup nem em
    mais nada, só corrige a categoria daquela linha. */
 export async function atualizarCategoriaTransacao(id, categoria) {

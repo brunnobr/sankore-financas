@@ -4,7 +4,7 @@
    hash de dedup. Cada linha resultante ainda passa pela fila de
    revisão antes de virar transação de verdade (ver Importar.jsx). */
 import { extrairLinhasPdf } from "./pdfText.js";
-import { parseOFX } from "./parsers/ofx.js";
+import { parseOFX, extrairContaOFX } from "./parsers/ofx.js";
 import { parseBanrisul } from "./parsers/banrisul.js";
 import { parseMercadoPagoConta } from "./parsers/mercadoPagoConta.js";
 import { filtrarRuido } from "./filtros.js";
@@ -24,7 +24,13 @@ async function detectarEParsear(file) {
   const ext = file.name.split(".").pop().toLowerCase();
 
   if (ext === "ofx") {
-    return { fonte: FONTES.find((f) => f.id === "inter-ofx"), brutas: parseOFX(await file.text()) };
+    const texto = await file.text();
+    const base = FONTES.find((f) => f.id === "inter-ofx");
+    const conta = extrairContaOFX(texto);
+    // Duas contas do mesmo banco (ex: Inter PF e PJ) não podem virar um
+    // "banco" só — o nº da conta desambigua; renomeável depois em Importar.
+    const banco = conta ? `${base.banco} •${conta.slice(-4)}` : base.banco;
+    return { fonte: { ...base, banco }, brutas: parseOFX(texto) };
   }
 
   if (ext === "pdf") {

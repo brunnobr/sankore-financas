@@ -14,6 +14,15 @@ function limparMemo(memo) {
   return memo.replace(/"/g, "").trim();
 }
 
+/* Número da conta (<ACCTID>, dentro de <BANKACCTFROM>) — aparece uma vez
+   no arquivo, fora dos blocos de transação. Usado pra distinguir duas
+   contas do mesmo banco (ex: Inter PF e PJ) que sem isso viram uma
+   coisa só no campo "banco". */
+export function extrairContaOFX(texto) {
+  const m = texto.match(/<ACCTID>([^<\r\n]*)/i);
+  return m ? m[1].trim() : "";
+}
+
 export function parseOFX(texto) {
   const blocos = texto.match(/<STMTTRN>[\s\S]*?<\/STMTTRN>/gi) || [];
   return blocos.map((bloco) => {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Pencil } from "lucide-react";
 import { parseArquivo } from "../lib/import/index.js";
-import { loadRegrasUsuario, salvarRegraCategorizacao, importarTransacoes, registrarImportLog, loadImportLog, loadTransacoes } from "../data/transactions.js";
+import { loadRegrasUsuario, salvarRegraCategorizacao, importarTransacoes, registrarImportLog, loadImportLog, loadTransacoes, renomearConta } from "../data/transactions.js";
 import { getCategoriasMap, getPalavrasCategoria } from "../data/settings.js";
 import { normalizar, brl, formatarDataBR, labelMes } from "../lib/finance/format.js";
 import { Panel } from "./shared/ui.jsx";
@@ -44,6 +44,9 @@ export default function Importar() {
   const [resultado, setResultado] = useState(null);
   const [log, setLog] = useState(null);
   const [porConta, setPorConta] = useState(null);
+  const [editandoConta, setEditandoConta] = useState(null);
+  const [nomeContaInput, setNomeContaInput] = useState("");
+  const [salvandoConta, setSalvandoConta] = useState(false);
 
   useEffect(() => {
     Promise.all([getCategoriasMap(), getPalavrasCategoria()]).then(([c, p]) => {
@@ -60,6 +63,22 @@ export default function Importar() {
 
   function carregarPorConta() {
     loadTransacoes().then((t) => setPorConta(agruparPorConta(t))).catch(() => setPorConta([]));
+  }
+
+  async function salvarNomeConta(bancoAntigo) {
+    const novo = nomeContaInput.trim();
+    setEditandoConta(null);
+    if (!novo || novo === bancoAntigo) return;
+    setSalvandoConta(true);
+    try {
+      await renomearConta(bancoAntigo, novo);
+      carregarLog();
+      carregarPorConta();
+    } catch (e2) {
+      setErro(`Erro ao renomear conta: ${e2.message}`);
+    } finally {
+      setSalvandoConta(false);
+    }
   }
 
   const categoriasDisponiveis = categoriasMap ? Object.keys(categoriasMap) : [];
@@ -125,7 +144,33 @@ export default function Importar() {
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {porConta.map((c) => (
               <div key={c.banco}>
-                <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 6 }}>{c.banco}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                  {editandoConta === c.banco ? (
+                    <>
+                      <input
+                        autoFocus
+                        value={nomeContaInput}
+                        onChange={(e) => setNomeContaInput(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") salvarNomeConta(c.banco); if (e.key === "Escape") setEditandoConta(null); }}
+                        style={{ padding: "4px 8px", border: "1px solid var(--rule)", borderRadius: 6, fontSize: 13.5, fontWeight: 600 }}
+                      />
+                      <button onClick={() => salvarNomeConta(c.banco)} style={{ padding: "4px 10px", background: "var(--accent)", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Salvar</button>
+                      <button onClick={() => setEditandoConta(null)} style={{ padding: "4px 10px", background: "transparent", color: "var(--ink-faint)", border: "1px solid var(--rule)", borderRadius: 6, fontSize: 12, cursor: "pointer" }}>Cancelar</button>
+                    </>
+                  ) : (
+                    <>
+                      <span style={{ fontWeight: 600, fontSize: 13.5 }}>{c.banco}</span>
+                      <button
+                        onClick={() => { setEditandoConta(c.banco); setNomeContaInput(c.banco); }}
+                        disabled={salvandoConta}
+                        title="Renomear conta"
+                        style={{ background: "transparent", border: "none", padding: 2, cursor: "pointer", color: "var(--ink-faint)", display: "flex" }}
+                      >
+                        <Pencil size={13} strokeWidth={2} />
+                      </button>
+                    </>
+                  )}
+                </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {c.meses.map((m) => (
                     <span

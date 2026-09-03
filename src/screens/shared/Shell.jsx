@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, TrendingUp, ArrowLeftRight, CreditCard, FileText,
-  BarChart3, LineChart, Target, LogOut, Bell, Settings, Menu,
+  BarChart3, LineChart, Target, LogOut, Bell, Settings, Menu, ArrowLeft,
 } from "lucide-react";
 import { supabase } from "../../data/supabaseClient.js";
 import { useAuth } from "../../data/AuthContext.jsx";
@@ -131,12 +131,20 @@ function Sidebar() {
 
 export function Topbar({ titulo, subtitulo }) {
   const { abrir } = useContext(SidebarCtx);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const mostrarVoltar = location.pathname !== "/";
   return (
     <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 28px", borderBottom: "1px solid var(--rule)", background: "var(--panel)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <button className="hamburger-btn" onClick={abrir} aria-label="Abrir menu" style={{ background: "transparent", border: "none", padding: 4, cursor: "pointer", color: "var(--ink)" }}>
           <Menu size={22} strokeWidth={2} />
         </button>
+        {mostrarVoltar && (
+          <button onClick={() => navigate(-1)} aria-label="Voltar" title="Voltar" style={{ background: "transparent", border: "none", padding: 4, cursor: "pointer", color: "var(--ink)", display: "flex" }}>
+            <ArrowLeft size={20} strokeWidth={2} />
+          </button>
+        )}
         <div>
           <h1 style={{ fontSize: 19, fontWeight: 700, margin: 0, color: "var(--ink)" }}>{titulo}</h1>
           {subtitulo && <p style={{ fontSize: 13, color: "var(--ink-faint)", margin: "2px 0 0" }}>{subtitulo}</p>}
