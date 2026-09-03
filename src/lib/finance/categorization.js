@@ -35,6 +35,22 @@ export function categoriasReceita(ag, categoriasMap) {
     .sort((a, b) => b.valor - a.valor);
 }
 
+/* Composição do aporte: valor positivo = saiu da conta pra investir,
+   negativo = voltou (ex: Resgate de investimentos). */
+export function categoriasAporte(ag, categoriasMap) {
+  return Object.entries(ag.porCategoria)
+    .filter(([cat]) => categoriasMap[cat]?.tipo === "aporte")
+    .map(([cat, v]) => ({ cat, valor: -v, cor: categoriasMap[cat]?.cor || "#525C4E" }))
+    .sort((a, b) => b.valor - a.valor);
+}
+
+/* Variação percentual entre dois valores — null quando não dá pra
+   comparar (mês anterior ausente ou base zero). */
+export function variacaoPct(atual, anterior) {
+  if (anterior == null || anterior === 0) return null;
+  return ((atual - anterior) / Math.abs(anterior)) * 100;
+}
+
 /* Só descreve o que o dado mostra, não inventa meta/orçamento. */
 export function avaliarGastos(atual, anterior, categoriasMap) {
   const linhas = [];

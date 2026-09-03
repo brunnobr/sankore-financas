@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Wallet, TrendingUp, TrendingDown, PiggyBank } from "lucide-react";
 import { loadTransacoes } from "../data/transactions.js";
 import { getCategoriasMap } from "../data/settings.js";
-import { agregarTx, categoriasDespesa, categoriasReceita, avaliarGastos } from "../lib/finance/categorization.js";
+import { agregarTx, categoriasDespesa, categoriasReceita, categoriasAporte, avaliarGastos, variacaoPct } from "../lib/finance/categorization.js";
 import { brl, labelMes } from "../lib/finance/format.js";
 import { Panel, StatCard } from "./shared/ui.jsx";
 
@@ -48,7 +48,13 @@ export default function Dashboard() {
 
   const despesasPorCategoria = agAtual ? categoriasDespesa(agAtual, categoriasMap) : [];
   const receitasPorCategoria = agAtual ? categoriasReceita(agAtual, categoriasMap) : [];
+  const aportePorCategoria = agAtual ? categoriasAporte(agAtual, categoriasMap) : [];
   const insights = agAtual ? avaliarGastos(agAtual, agAnterior, categoriasMap) : [];
+
+  const varReceita = agAtual && agAnterior ? variacaoPct(agAtual.receita, agAnterior.receita) : null;
+  const varDespesa = agAtual && agAnterior ? variacaoPct(agAtual.despesa, agAnterior.despesa) : null;
+  const varAporte = agAtual && agAnterior ? variacaoPct(agAtual.aporte, agAnterior.aporte) : null;
+  const varSobra = agAtual && agAnterior ? variacaoPct(agAtual.sobra, agAnterior.sobra) : null;
 
   if (erro) return <p style={{ color: "var(--debit)" }}>{erro}</p>;
   if (!pronto) return <p style={{ color: "var(--ink-faint)" }}>Carregando…</p>;
@@ -63,14 +69,15 @@ export default function Dashboard() {
       </select>
 
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-        <StatCard icon={TrendingUp} cor="green" rotulo="Receita" valor={brl(agAtual.receita)} onClick={() => navigate(`/receitas-despesas?mes=${mesAtual}&tipo=receita`)} />
-        <StatCard icon={TrendingDown} cor="red" rotulo="Despesa" valor={brl(agAtual.despesa)} onClick={() => navigate(`/receitas-despesas?mes=${mesAtual}&tipo=despesa`)} />
-        <StatCard icon={Wallet} cor="blue" rotulo="Aporte" valor={brl(agAtual.aporte)} onClick={() => navigate(`/receitas-despesas?mes=${mesAtual}&tipo=aporte`)} />
+        <StatCard icon={TrendingUp} cor="green" rotulo="Receita" valor={brl(agAtual.receita)} variacao={varReceita} onClick={() => navigate(`/receitas-despesas?mes=${mesAtual}&tipo=receita`)} />
+        <StatCard icon={TrendingDown} cor="red" rotulo="Despesa" valor={brl(agAtual.despesa)} variacao={varDespesa} variacaoInvertida onClick={() => navigate(`/receitas-despesas?mes=${mesAtual}&tipo=despesa`)} />
+        <StatCard icon={Wallet} cor="blue" rotulo="Aporte" valor={brl(agAtual.aporte)} variacao={varAporte} onClick={() => navigate(`/receitas-despesas?mes=${mesAtual}&tipo=aporte`)} />
         <StatCard
           icon={PiggyBank}
           cor={agAtual.sobra >= 0 ? "green" : "red"}
           rotulo="Sobra do mês"
           valor={brl(agAtual.sobra)}
+          variacao={varSobra}
           sub={agAtual.taxaPoupanca != null ? `${agAtual.taxaPoupanca.toFixed(1)}% de taxa de poupança` : undefined}
         />
       </div>
@@ -118,6 +125,25 @@ export default function Dashboard() {
           </table>
         </Panel>
       </div>
+
+      {aportePorCategoria.length > 0 && (
+        <Panel title="Composição do aporte do mês">
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <tbody>
+              {aportePorCategoria.map((c) => (
+                <tr key={c.cat} style={{ borderBottom: "1px solid var(--rule)" }}>
+                  <td style={{ padding: "8px 4px" }}>
+                    <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, background: c.cor, marginRight: 8 }} />
+                    {c.cat}
+                    <span style={{ marginLeft: 8, fontSize: 11.5, color: "var(--ink-faint)" }}>{c.valor >= 0 ? "saiu para" : "voltou de"}</span>
+                  </td>
+                  <td style={{ padding: "8px 4px", textAlign: "right", color: c.valor >= 0 ? "var(--credit)" : "var(--debit)" }}>{brl(c.valor)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Panel>
+      )}
     </div>
   );
 }

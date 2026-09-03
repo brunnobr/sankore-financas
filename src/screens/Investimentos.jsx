@@ -191,6 +191,7 @@ export default function Investimentos() {
       </div>
 
       <Panel title={`Retorno por ativo (vs ${prev ? labelMes(prev.key) : "—"})`}>
+        <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
             <tr style={{ textAlign: "left", borderBottom: "1px solid var(--rule)", color: "var(--ink-faint)" }}>
@@ -213,6 +214,7 @@ export default function Investimentos() {
             ))}
           </tbody>
         </table>
+        </div>
       </Panel>
 
       <AtualizarSaldoForm tickers={tickers} onSalvo={carregar} />

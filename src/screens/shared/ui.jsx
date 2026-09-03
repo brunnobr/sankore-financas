@@ -18,8 +18,9 @@ export function Panel({ title, action, children, style }) {
 
 const CORES_ICONE = { green: "#16a34a", blue: "#2563eb", purple: "#7c3aed", red: "#dc2626", amber: "#d97706" };
 
-export function StatCard({ icon: Icon, cor = "green", rotulo, valor, variacao, sub, onClick }) {
+export function StatCard({ icon: Icon, cor = "green", rotulo, valor, variacao, variacaoInvertida, sub, onClick }) {
   const corIcone = CORES_ICONE[cor] || CORES_ICONE.green;
+  const bom = variacao != null ? (variacaoInvertida ? variacao < 0 : variacao >= 0) : null;
   return (
     <div
       onClick={onClick}
@@ -33,8 +34,8 @@ export function StatCard({ icon: Icon, cor = "green", rotulo, valor, variacao, s
       </div>
       <div style={{ fontSize: 22, fontWeight: 700, color: "var(--ink)" }}>{valor}</div>
       {(variacao != null || sub) && (
-        <div style={{ fontSize: 12, color: variacao != null ? (variacao >= 0 ? "var(--credit)" : "var(--debit)") : "var(--ink-faint)", display: "flex", alignItems: "center", gap: 4 }}>
-          {variacao != null && <span>{variacao >= 0 ? "▲" : "▼"} {Math.abs(variacao).toFixed(1)}%</span>}
+        <div style={{ fontSize: 12, color: bom != null ? (bom ? "var(--credit)" : "var(--debit)") : "var(--ink-faint)", display: "flex", alignItems: "center", gap: 4 }}>
+          {variacao != null && <span>{variacao >= 0 ? "▲" : "▼"} {Math.abs(variacao).toFixed(1)}% vs mês anterior</span>}
           {sub && <span style={{ color: "var(--ink-faint)" }}>{sub}</span>}
         </div>
       )}
