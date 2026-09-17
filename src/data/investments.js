@@ -86,6 +86,33 @@ export async function salvarAporteAtivo({ ticker, mes, valor, dataISO }) {
   if (error) throw error;
 }
 
+/* Aporte a partir de uma nota de corretagem — grava vários ativos de uma
+   vez (uma nota normalmente tem mais de um negócio no mesmo pregão).
+   Mesmo upsert por (usuário, mês) do aporte manual, mas soma ao que já
+   existir no ticker (duas notas no mesmo mês pro mesmo ativo acumulam,
+   não sobrescrevem) e guarda o número da nota + taxas extraídas. */
+export async function salvarAporteNotaCorretagem({ mes, dataISO, notaNumero, itens, taxas }) {
+  const userId = await uid();
+  const { data: existente, error: e1 } = await supabase
+    .from("contributions")
+    .select("breakdown")
+    .eq("user_id", userId)
+    .eq("month", mes)
+    .maybeSingle();
+  if (e1) throw e1;
+  const breakdown = { ...(existente?.breakdown || {}) };
+  for (const it of itens) {
+    const anterior = Number(breakdown[it.ticker]?.valor) || 0;
+    breakdown[it.ticker] = { valor: Number((anterior + it.valor).toFixed(2)), cotas: it.quantidade, preco: it.preco };
+  }
+  const total = Object.values(breakdown).reduce((s, a) => s + (Number(a.valor) || 0), 0);
+  const { error } = await supabase.from("contributions").upsert(
+    { user_id: userId, month: mes, total, data_iso: dataISO, origem: "nota_corretagem", nota_numero: notaNumero, breakdown, taxas: taxas || [] },
+    { onConflict: "user_id,month" }
+  );
+  if (error) throw error;
+}
+
 /* Sobe a captura de tela pra Edge Function (parse-investment-screenshot),
    que chama a API da Claude e devolve [{nome, valor, moeda?}] — nada é
    gravado aqui, só extraído; a revisão/gravação fica em

@@ -30,6 +30,19 @@ export const getPalavrasCategoria = () => getOrSeedSetting("palavras_categoria",
 
 export const getTetoMeiMap = () => getOrSeedSetting("teto_mei", TETO_MEI_SEED);
 
+/* Apelido de ativo: nome bruto como sai do PDF da nota de corretagem
+   (ex: "CI INVESTOVWRA", colunas grudadas na extração de texto) -> ticker
+   real (ex: "VWRA11"). Aprendido sozinho: toda vez que você corrige o
+   nome na tela de importação, a correção fica salva aqui e a próxima
+   nota com o mesmo texto bruto já vem resolvida. */
+export const getAliasAtivos = () => getOrSeedSetting("alias_ativos", {});
+
+export async function salvarAliasAtivo(bruto, ticker) {
+  const atual = await getAliasAtivos();
+  if (atual[bruto] === ticker) return;
+  await updateSetting("alias_ativos", { ...atual, [bruto]: ticker });
+}
+
 export async function updateSetting(chave, valor) {
   const { data: userData } = await supabase.auth.getUser();
   const { error } = await supabase.from("settings").upsert({ user_id: userData.user.id, chave, valor, updated_at: new Date().toISOString() });

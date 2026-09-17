@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Pencil } from "lucide-react";
 import { parseArquivo } from "../lib/import/index.js";
+import { extrairLinhasPdf } from "../lib/import/pdfText.js";
+import { parseNotaCorretagem } from "../lib/import/parsers/notaCorretagem.js";
 import { loadRegrasUsuario, salvarRegraCategorizacao, importarTransacoes, registrarImportLog, loadTransacoes, renomearConta } from "../data/transactions.js";
-import { getCategoriasMap, getPalavrasCategoria } from "../data/settings.js";
-import { loadMonths, salvarSnapshotAtivo, salvarAporteAtivo, extrairSaldosDePrint } from "../data/investments.js";
+import { getCategoriasMap, getPalavrasCategoria, getAliasAtivos, salvarAliasAtivo } from "../data/settings.js";
+import { loadMonths, salvarSnapshotAtivo, salvarAporteAtivo, salvarAporteNotaCorretagem, extrairSaldosDePrint } from "../data/investments.js";
 import { normalizar, brl, formatarDataBR, labelMes } from "../lib/finance/format.js";
 import { Panel } from "./shared/ui.jsx";
 import { NFSeUpload } from "../components/NFSeUpload";
@@ -72,6 +74,134 @@ function AtualizarSaldoForm({ tickers, onSalvo }) {
    entrou em qual ativo naquele mês). Separado do saldo (que é o
    fechamento total do ativo), grava em contributions.breakdown e
    alimenta "Composição do aporte do mês" no Dashboard. */
+/* Sobe o PDF da nota de corretagem, extrai os negócios (client-side,
+   pdfjs-dist — sem Edge Function, o PDF já tem texto selecionável) e
+   cai numa fila de revisão igual ao print: o "ticker" extraído pode vir
+   com o código do segmento grudado (ex: "CI WRLD11"), então sempre
+   revisa antes de confirmar. */
+function ImportarCorretagemForm({ tickers, onSalvo }) {
+  const [lendo, setLendo] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [nota, setNota] = useState(null); // { notaNumero, dataPregao, taxas }
+  const [itens, setItens] = useState(null);
+  const [erro, setErro] = useState("");
+
+  async function onArquivo(e) {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    setErro("");
+    setItens(null);
+    setNota(null);
+    setLendo(true);
+    try {
+      const [linhas, aliasMap] = await Promise.all([extrairLinhasPdf(file), getAliasAtivos()]);
+      const r = parseNotaCorretagem(linhas);
+      setNota({ notaNumero: r.notaNumero, dataPregao: r.dataPregao, taxas: r.taxas });
+      // "bruto" guarda o texto original da nota — se você corrigir o
+      // ticker antes de confirmar, o apelido bruto->ticker fica salvo
+      // pra próxima nota já vir resolvida (ver confirmar()).
+      setItens(r.itens.map((it) => ({ ...it, bruto: it.ticker, ticker: aliasMap[it.ticker] || it.ticker, incluir: true })));
+    } catch (e2) {
+      setErro(e2.message || "Erro ao ler a nota de corretagem.");
+    } finally {
+      setLendo(false);
+    }
+  }
+
+  function atualizarItem(i, campo, valor) {
+    setItens((prev) => prev.map((it, idx) => (idx === i ? { ...it, [campo]: valor } : it)));
+  }
+
+  async function confirmar() {
+    setSalvando(true);
+    setErro("");
+    try {
+      const incluidos = itens.filter((it) => it.incluir).map((it) => ({ ...it, ticker: it.ticker.trim(), valor: Number(it.valor) }));
+      await Promise.all(
+        incluidos.filter((it) => it.bruto && it.bruto !== it.ticker).map((it) => salvarAliasAtivo(it.bruto, it.ticker))
+      );
+      await salvarAporteNotaCorretagem({
+        mes: `${nota.dataPregao.slice(0, 7)}-01`,
+        dataISO: nota.dataPregao,
+        notaNumero: nota.notaNumero,
+        itens: incluidos,
+        taxas: nota.taxas,
+      });
+      setItens(null);
+      setNota(null);
+      onSalvo();
+    } catch (e2) {
+      setErro(e2.message || "Erro ao salvar a nota de corretagem.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <Panel title="Importar nota de corretagem">
+      <p style={{ fontSize: 13, color: "var(--ink-faint)", marginTop: -8, marginBottom: 12 }}>
+        Sobe o PDF da nota — lê os negócios do pregão, você confere/corrige o ativo e confirma antes de gravar como aporte do mês.
+      </p>
+      <input type="file" accept="application/pdf" onChange={onArquivo} disabled={lendo || salvando} />
+      {lendo && <span style={{ marginLeft: 10, fontSize: 13, color: "var(--ink-faint)" }}>Lendo a nota…</span>}
+
+      {erro && <p style={{ color: "var(--debit)", marginTop: 12, marginBottom: 0 }}>{erro}</p>}
+
+      {nota && itens && itens.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <p style={{ fontSize: 12.5, color: "var(--ink-faint)", margin: "0 0 8px" }}>
+            Nota nº {nota.notaNumero} — pregão {formatarDataBR(nota.dataPregao)}
+            {nota.taxas?.[0] && ` — ${nota.taxas[0].nome}: ${brl(nota.taxas[0].valor)}`}
+          </p>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ textAlign: "left", borderBottom: "1px solid var(--rule)", color: "var(--ink-faint)" }}>
+                  <th style={{ padding: "6px 4px" }}></th>
+                  <th style={{ padding: "6px 4px" }}>Ativo</th>
+                  <th style={{ padding: "6px 4px" }}>C/V</th>
+                  <th style={{ padding: "6px 4px", textAlign: "right" }}>Qtd</th>
+                  <th style={{ padding: "6px 4px", textAlign: "right" }}>Preço</th>
+                  <th style={{ padding: "6px 4px", textAlign: "right" }}>Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {itens.map((it, i) => (
+                  <tr key={i} style={{ borderBottom: "1px solid var(--rule)", opacity: it.incluir ? 1 : 0.4 }}>
+                    <td style={{ padding: "8px 4px" }}>
+                      <input type="checkbox" checked={it.incluir} onChange={(e) => atualizarItem(i, "incluir", e.target.checked)} />
+                    </td>
+                    <td style={{ padding: "8px 4px" }}>
+                      <input list="tickers-existentes-corretagem" value={it.ticker} onChange={(e) => atualizarItem(i, "ticker", e.target.value)} style={{ padding: "4px 8px", border: "1px solid var(--rule)", borderRadius: 6, minWidth: 160 }} />
+                    </td>
+                    <td style={{ padding: "8px 4px", color: it.cv === "C" ? "var(--debit)" : "var(--credit)" }}>{it.cv === "C" ? "Compra" : "Venda"}</td>
+                    <td style={{ padding: "8px 4px", textAlign: "right" }}>{it.quantidade}</td>
+                    <td style={{ padding: "8px 4px", textAlign: "right" }}>{brl(it.preco)}</td>
+                    <td style={{ padding: "8px 4px", textAlign: "right" }}>
+                      <input type="number" step="0.01" value={it.valor} onChange={(e) => atualizarItem(i, "valor", e.target.value)} style={{ padding: "4px 8px", border: "1px solid var(--rule)", borderRadius: 6, width: 110, textAlign: "right" }} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <datalist id="tickers-existentes-corretagem">
+            {tickers.map((t) => <option key={t} value={t} />)}
+          </datalist>
+          <button
+            onClick={confirmar}
+            disabled={salvando || !itens.some((it) => it.incluir)}
+            style={{ marginTop: 16, padding: "10px 20px", background: "var(--accent)", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600 }}
+          >
+            {salvando ? "Salvando…" : `Confirmar e gravar ${itens.filter((it) => it.incluir).length} negócio(s)`}
+          </button>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
 function RegistrarAporteForm({ tickers, onSalvo }) {
   const hoje = new Date().toISOString().slice(0, 10);
   const [ticker, setTicker] = useState("");
@@ -506,6 +636,7 @@ export default function Importar() {
       <div style={{ borderTop: "1px solid var(--rule)", paddingTop: 20, marginTop: 20, display: "flex", flexDirection: "column", gap: 20 }}>
         <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Saldos de investimento</h2>
         <ImportarPrintForm tickers={tickersInvestimento} onSalvo={carregarInvestMonths} />
+        <ImportarCorretagemForm tickers={tickersInvestimento} onSalvo={carregarInvestMonths} />
         <AtualizarSaldoForm tickers={tickersInvestimento} onSalvo={carregarInvestMonths} />
         <RegistrarAporteForm tickers={tickersInvestimento} onSalvo={carregarInvestMonths} />
       </div>
