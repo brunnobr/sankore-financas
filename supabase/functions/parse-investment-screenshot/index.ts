@@ -1,8 +1,16 @@
 // Edge Function: lê capturas de tela de apps de investimento (Banco Inter,
 // Mercado Pago etc) e extrai {nome, valor} de cada posição via API da
-// Claude (visão). Chamada pelo botão "Importar por print" em Investimentos
+// Claude (visão). Chamada pelo botão "Importar por print" em Importar
 // — ver src/data/investments.js (extrairSaldosDePrint) e
-// src/screens/Investimentos.jsx (ImportarPrintForm).
+// src/screens/Importar.jsx (ImportarPrintForm).
+//
+// Sem dependência de @supabase/supabase-js (o import remoto via esm.sh
+// causava falha intermitente no boot da function — 502 EDGE_FUNCTION_ERROR
+// quase instantâneo, antes até de chamar a API da Claude). A checagem de
+// autenticação chama diretamente o endpoint /auth/v1/user do seu projeto
+// — o mesmo que supabase.auth.getUser() chamaria por baixo dos panos —
+// então a verificação de assinatura do token continua sendo feita pelo
+// Supabase Auth, só sem a dependência externa.
 //
 // Deploy (rodar na sua máquina, com Supabase CLI instalado e logado):
 //   supabase functions deploy parse-investment-screenshot
@@ -10,8 +18,6 @@
 //
 // A chave da Anthropic é sua (console.anthropic.com) — nunca cole ela no
 // chat comigo, só no comando acima rodado localmente.
-
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -21,6 +27,20 @@ const CORS = {
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
+
+// Verifica o usuário chamando o próprio endpoint de auth do Supabase (o
+// mesmo que supabase-js usaria) — a assinatura do JWT é validada no
+// servidor, não aqui. Repassa os headers que o cliente já mandou.
+async function usuarioAutenticado(req: Request): Promise<boolean> {
+  const authHeader = req.headers.get("Authorization");
+  const apikey = req.headers.get("apikey");
+  if (!authHeader || !apikey) return false;
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const resp = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: { Authorization: authHeader, apikey },
+  });
+  return resp.ok;
+}
 
 const SYSTEM_PROMPT = `Você lê capturas de tela de apps de investimento (Banco Inter, Mercado Pago etc) e extrai cada posição/ativo com seu saldo.
 
@@ -37,13 +57,7 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Método não permitido." }, 405);
 
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: req.headers.get("Authorization") || "" } } }
-    );
-    const { data: userData, error: userErr } = await supabase.auth.getUser();
-    if (userErr || !userData?.user) return json({ error: "Não autenticado." }, 401);
+    if (!(await usuarioAutenticado(req))) return json({ error: "Não autenticado." }, 401);
 
     const { imagens } = await req.json();
     if (!Array.isArray(imagens) || !imagens.length) return json({ error: "Nenhuma imagem enviada." }, 400);

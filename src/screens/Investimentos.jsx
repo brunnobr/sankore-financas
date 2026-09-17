@@ -13,6 +13,35 @@ import {
 import { brl, pct, labelMes } from "../lib/finance/format.js";
 import { Panel, StatCard } from "./shared/ui.jsx";
 
+// Clareia/escurece uma cor hex (#rrggbb) para simular o brilho de uma peça
+// de plástico (gradiente radial: claro no canto, cor real na borda).
+function ajustarCor(hex, pct) {
+  const n = parseInt(hex.replace("#", ""), 16);
+  const r = Math.min(255, Math.max(0, ((n >> 16) & 255) + Math.round(255 * pct)));
+  const g = Math.min(255, Math.max(0, ((n >> 8) & 255) + Math.round(255 * pct)));
+  const b = Math.min(255, Math.max(0, (n & 255) + Math.round(255 * pct)));
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+// Defs de gradiente radial (um por fatia) + filtro de sombra — dá o efeito
+// de peça de plástico brilhante em vez de uma fatia lisa.
+function RoscaDefs({ dados, idKey, idPrefix }) {
+  return (
+    <defs>
+      {dados.map((d) => (
+        <radialGradient key={d[idKey]} id={`${idPrefix}-${d[idKey]}`} cx="35%" cy="30%" r="75%">
+          <stop offset="0%" stopColor={ajustarCor(d.cor, 0.35)} />
+          <stop offset="55%" stopColor={d.cor} />
+          <stop offset="100%" stopColor={ajustarCor(d.cor, -0.15)} />
+        </radialGradient>
+      ))}
+      <filter id="rosca-sombra" x="-30%" y="-30%" width="160%" height="160%">
+        <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#000" floodOpacity="0.35" />
+      </filter>
+    </defs>
+  );
+}
+
 const selectStyle = { padding: "6px 8px", border: "1px solid var(--rule)", borderRadius: 6, fontSize: 13, background: "var(--panel)" };
 
 /* Classificação de cada ativo por função (onde entra o aporte, ver
@@ -221,8 +250,9 @@ export default function Investimentos() {
         <Panel title="Composição por função" style={{ flex: 1, minWidth: 300 }}>
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
-              <Pie data={grupos} dataKey="valor" nameKey="label" innerRadius={55} outerRadius={85} paddingAngle={2}>
-                {grupos.map((g) => <Cell key={g.grupo} fill={g.cor} />)}
+              <RoscaDefs dados={grupos} idKey="grupo" idPrefix="grad-fn" />
+              <Pie data={grupos} dataKey="valor" nameKey="label" innerRadius={55} outerRadius={85} paddingAngle={4} cornerRadius={8} filter="url(#rosca-sombra)" stroke="none">
+                {grupos.map((g) => <Cell key={g.grupo} fill={`url(#grad-fn-${g.grupo})`} />)}
               </Pie>
               <Tooltip formatter={(v) => brl(v)} />
               <Legend />
@@ -232,8 +262,9 @@ export default function Investimentos() {
         <Panel title="Composição por tipo" style={{ flex: 1, minWidth: 300 }}>
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
-              <Pie data={tipos} dataKey="valor" nameKey="label" innerRadius={55} outerRadius={85} paddingAngle={2}>
-                {tipos.map((t) => <Cell key={t.tipo} fill={t.cor} />)}
+              <RoscaDefs dados={tipos} idKey="tipo" idPrefix="grad-tp" />
+              <Pie data={tipos} dataKey="valor" nameKey="label" innerRadius={55} outerRadius={85} paddingAngle={4} cornerRadius={8} filter="url(#rosca-sombra)" stroke="none">
+                {tipos.map((t) => <Cell key={t.tipo} fill={`url(#grad-tp-${t.tipo})`} />)}
               </Pie>
               <Tooltip formatter={(v) => brl(v)} />
               <Legend />
