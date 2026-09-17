@@ -82,12 +82,22 @@ export async function rejeitarNFSe(id) {
 }
 
 /* Status de pagamento não tem coluna própria — reaproveita recebimento_iso
-   (já existia na tabela, sem uso): null = aguardando, data = recebido
-   naquele dia. Independente do status de revisão. */
-export async function marcarPagamento(id, statusPagamento) {
+   (data) e conta_recebimento (banco), já existiam na tabela sem uso.
+   null = aguardando. Recebido é sempre vinculado a um lançamento real do
+   extrato (mesmo valor) — não um "marcar como recebido hoje" arbitrário. */
+export async function marcarRecebido(id, { dataISO, banco }) {
   const userId = await uid();
-  const patch = { recebimento_iso: statusPagamento === "recebido" ? new Date().toISOString().slice(0, 10) : null };
-  const { error } = await supabase.from("nfse").update(patch).eq("id", id).eq("user_id", userId);
+  const { error } = await supabase.from("nfse")
+    .update({ recebimento_iso: dataISO, conta_recebimento: banco || null })
+    .eq("id", id).eq("user_id", userId);
+  if (error) throw error;
+}
+
+export async function marcarAguardando(id) {
+  const userId = await uid();
+  const { error } = await supabase.from("nfse")
+    .update({ recebimento_iso: null, conta_recebimento: null })
+    .eq("id", id).eq("user_id", userId);
   if (error) throw error;
 }
 

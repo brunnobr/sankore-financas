@@ -65,6 +65,27 @@ export async function salvarSnapshotAtivo({ ticker, mes, valor }) {
   if (error) throw error;
 }
 
+/* Aporte por ativo — vem da nota de corretagem/extrato. Um registro por
+   (usuário, mês): grava/atualiza só o ticker informado dentro do
+   breakdown jsonb, mantendo os outros ativos já lançados no mês. */
+export async function salvarAporteAtivo({ ticker, mes, valor, dataISO }) {
+  const userId = await uid();
+  const { data: existente, error: e1 } = await supabase
+    .from("contributions")
+    .select("breakdown")
+    .eq("user_id", userId)
+    .eq("month", mes)
+    .maybeSingle();
+  if (e1) throw e1;
+  const breakdown = { ...(existente?.breakdown || {}), [ticker]: { valor: Number(valor) } };
+  const total = Object.values(breakdown).reduce((s, a) => s + (Number(a.valor) || 0), 0);
+  const { error } = await supabase.from("contributions").upsert(
+    { user_id: userId, month: mes, total, data_iso: dataISO || mes, origem: "manual", breakdown },
+    { onConflict: "user_id,month" }
+  );
+  if (error) throw error;
+}
+
 /* Sobe a captura de tela pra Edge Function (parse-investment-screenshot),
    que chama a API da Claude e devolve [{nome, valor, moeda?}] — nada é
    gravado aqui, só extraído; a revisão/gravação fica em

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  BarChart, Bar, LineChart, Line, AreaChart, Area, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, Legend,
 } from "recharts";
 import { Landmark, PiggyBank, Wallet, Percent } from "lucide-react";
@@ -124,9 +124,7 @@ export default function Investimentos() {
     if (!pronto) return [];
     return months.map((m) => ({
       mes: labelMes(m.key).slice(0, 3),
-      total: totalDoMes(m),
       investido: investido(assetGroupMap, m),
-      caixa: caixaDoMes(assetGroupMap, m),
     }));
   }, [pronto, months, assetGroupMap]);
 
@@ -197,10 +195,7 @@ export default function Investimentos() {
               <XAxis dataKey="mes" stroke="var(--ink-faint)" fontSize={12} />
               <YAxis stroke="var(--ink-faint)" fontSize={12} tickFormatter={(v) => brl(v)} width={90} />
               <Tooltip formatter={(v) => brl(v)} />
-              <Legend />
-              <Bar dataKey="total" name="Total" fill="var(--ink)" />
               <Bar dataKey="investido" name="Investido" fill="var(--credit)" />
-              <Bar dataKey="caixa" name="Caixa" fill="var(--blue)" />
             </BarChart>
           ) : tipoGrafico === "area" ? (
             <AreaChart data={evolucao}>
@@ -208,10 +203,7 @@ export default function Investimentos() {
               <XAxis dataKey="mes" stroke="var(--ink-faint)" fontSize={12} />
               <YAxis stroke="var(--ink-faint)" fontSize={12} tickFormatter={(v) => brl(v)} width={90} />
               <Tooltip formatter={(v) => brl(v)} />
-              <Legend />
-              <Area type="monotone" dataKey="total" name="Total" stroke="var(--ink)" fill="var(--ink)" fillOpacity={0.15} />
               <Area type="monotone" dataKey="investido" name="Investido" stroke="var(--credit)" fill="var(--credit)" fillOpacity={0.15} />
-              <Area type="monotone" dataKey="caixa" name="Caixa" stroke="var(--blue)" fill="var(--blue)" fillOpacity={0.15} />
             </AreaChart>
           ) : (
             <LineChart data={evolucao}>
@@ -219,10 +211,7 @@ export default function Investimentos() {
               <XAxis dataKey="mes" stroke="var(--ink-faint)" fontSize={12} />
               <YAxis stroke="var(--ink-faint)" fontSize={12} tickFormatter={(v) => brl(v)} width={90} />
               <Tooltip formatter={(v) => brl(v)} />
-              <Legend />
-              <Line type="monotone" dataKey="total" name="Total" stroke="var(--ink)" strokeWidth={2} dot />
               <Line type="monotone" dataKey="investido" name="Investido" stroke="var(--credit)" strokeWidth={2} dot />
-              <Line type="monotone" dataKey="caixa" name="Caixa" stroke="var(--blue)" strokeWidth={1.5} dot />
             </LineChart>
           )}
         </ResponsiveContainer>
@@ -230,27 +219,25 @@ export default function Investimentos() {
 
       <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
         <Panel title="Composição por função" style={{ flex: 1, minWidth: 300 }}>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={grupos} layout="vertical">
-              <XAxis type="number" tickFormatter={(v) => brl(v)} stroke="var(--ink-faint)" fontSize={11} />
-              <YAxis type="category" dataKey="label" width={100} stroke="var(--ink-faint)" fontSize={12} />
-              <Tooltip formatter={(v) => brl(v)} />
-              <Bar dataKey="valor">
+          <ResponsiveContainer width="100%" height={220}>
+            <PieChart>
+              <Pie data={grupos} dataKey="valor" nameKey="label" innerRadius={55} outerRadius={85} paddingAngle={2}>
                 {grupos.map((g) => <Cell key={g.grupo} fill={g.cor} />)}
-              </Bar>
-            </BarChart>
+              </Pie>
+              <Tooltip formatter={(v) => brl(v)} />
+              <Legend />
+            </PieChart>
           </ResponsiveContainer>
         </Panel>
         <Panel title="Composição por tipo" style={{ flex: 1, minWidth: 300 }}>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={tipos} layout="vertical">
-              <XAxis type="number" tickFormatter={(v) => brl(v)} stroke="var(--ink-faint)" fontSize={11} />
-              <YAxis type="category" dataKey="label" width={140} stroke="var(--ink-faint)" fontSize={12} />
-              <Tooltip formatter={(v) => brl(v)} />
-              <Bar dataKey="valor">
+          <ResponsiveContainer width="100%" height={220}>
+            <PieChart>
+              <Pie data={tipos} dataKey="valor" nameKey="label" innerRadius={55} outerRadius={85} paddingAngle={2}>
                 {tipos.map((t) => <Cell key={t.tipo} fill={t.cor} />)}
-              </Bar>
-            </BarChart>
+              </Pie>
+              <Tooltip formatter={(v) => brl(v)} />
+              <Legend />
+            </PieChart>
           </ResponsiveContainer>
         </Panel>
       </div>

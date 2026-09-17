@@ -85,9 +85,9 @@ export default function ReceitasDespesas() {
                 <tr style={{ textAlign: "left", borderBottom: "1px solid var(--rule)", color: "var(--ink-faint)" }}>
                   <th style={{ padding: "6px 4px" }}>Data</th>
                   <th style={{ padding: "6px 4px" }}>Descrição</th>
-                  <th style={{ padding: "6px 4px" }}>Categoria</th>
-                  <th style={{ padding: "6px 4px" }}>Banco</th>
                   <th style={{ padding: "6px 4px", textAlign: "right" }}>Valor</th>
+                  <th style={{ padding: "6px 4px" }}>Banco</th>
+                  <th style={{ padding: "6px 4px" }}>Categoria</th>
                 </tr>
               </thead>
               <tbody>
@@ -95,14 +95,14 @@ export default function ReceitasDespesas() {
                   <tr key={t.id} style={{ borderBottom: "1px solid var(--rule)" }}>
                     <td style={{ padding: "8px 4px", whiteSpace: "nowrap" }}>{formatarDataBR(t.data)}</td>
                     <td style={{ padding: "8px 4px" }}>{t.desc}</td>
+                    <td style={{ padding: "8px 4px", textAlign: "right", color: t.valor >= 0 ? "var(--credit)" : "var(--debit)", whiteSpace: "nowrap" }}>{brl(t.valor)}</td>
+                    <td style={{ padding: "8px 4px", color: "var(--ink-faint)" }}>{t.banco}</td>
                     <td style={{ padding: "8px 4px" }}>
                       <select value={t.cat} onChange={(e) => onMudarCategoria(t.id, e.target.value)} style={selectCatStyle}>
                         {!categoriasDisponiveis.includes(t.cat) && <option value={t.cat}>{t.cat}</option>}
                         {categoriasDisponiveis.map((c) => <option key={c} value={c}>{c}</option>)}
                       </select>
                     </td>
-                    <td style={{ padding: "8px 4px", color: "var(--ink-faint)" }}>{t.banco}</td>
-                    <td style={{ padding: "8px 4px", textAlign: "right", color: t.valor >= 0 ? "var(--credit)" : "var(--debit)", whiteSpace: "nowrap" }}>{brl(t.valor)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -3,7 +3,7 @@ import { Pencil } from "lucide-react";
 import { parseArquivo } from "../lib/import/index.js";
 import { loadRegrasUsuario, salvarRegraCategorizacao, importarTransacoes, registrarImportLog, loadTransacoes, renomearConta } from "../data/transactions.js";
 import { getCategoriasMap, getPalavrasCategoria } from "../data/settings.js";
-import { loadMonths, salvarSnapshotAtivo, extrairSaldosDePrint } from "../data/investments.js";
+import { loadMonths, salvarSnapshotAtivo, salvarAporteAtivo, extrairSaldosDePrint } from "../data/investments.js";
 import { normalizar, brl, formatarDataBR, labelMes } from "../lib/finance/format.js";
 import { Panel } from "./shared/ui.jsx";
 import { NFSeUpload } from "../components/NFSeUpload";
@@ -57,6 +57,67 @@ function AtualizarSaldoForm({ tickers, onSalvo }) {
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <label style={{ fontSize: 12, color: "var(--ink-faint)" }}>Saldo (R$)</label>
+          <input type="number" step="0.01" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" style={{ padding: "6px 8px", border: "1px solid var(--rule)", borderRadius: 6, width: 140 }} />
+        </div>
+        <button type="submit" disabled={salvando} style={{ padding: "8px 16px", background: "var(--accent)", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600 }}>
+          {salvando ? "Salvando…" : "Salvar"}
+        </button>
+      </form>
+      {erro && <p style={{ color: "var(--debit)", marginBottom: 0, marginTop: 8 }}>{erro}</p>}
+    </Panel>
+  );
+}
+
+/* Aporte por ativo — vem da nota de corretagem ou do extrato (quanto
+   entrou em qual ativo naquele mês). Separado do saldo (que é o
+   fechamento total do ativo), grava em contributions.breakdown e
+   alimenta "Composição do aporte do mês" no Dashboard. */
+function RegistrarAporteForm({ tickers, onSalvo }) {
+  const hoje = new Date().toISOString().slice(0, 10);
+  const [ticker, setTicker] = useState("");
+  const [mes, setMes] = useState(hoje.slice(0, 7));
+  const [valor, setValor] = useState("");
+  const [data, setData] = useState(hoje);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+
+  async function onSubmit(e) {
+    e.preventDefault();
+    if (!ticker.trim() || !mes || valor === "") return;
+    setSalvando(true);
+    setErro("");
+    try {
+      await salvarAporteAtivo({ ticker: ticker.trim(), mes: `${mes}-01`, valor: Number(valor), dataISO: data });
+      setTicker("");
+      setValor("");
+      onSalvo();
+    } catch (e2) {
+      setErro(e2.message || "Erro ao salvar aporte.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <Panel title="Registrar aporte por ativo">
+      <p style={{ fontSize: 13, color: "var(--ink-faint)", marginTop: -8, marginBottom: 12 }}>
+        Da nota de corretagem ou do extrato — quanto entrou em qual ativo no mês.
+      </p>
+      <form onSubmit={onSubmit} style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <label style={{ fontSize: 12, color: "var(--ink-faint)" }}>Ativo</label>
+          <input list="tickers-existentes" value={ticker} onChange={(e) => setTicker(e.target.value)} placeholder="ex: WRLD11" style={{ padding: "6px 8px", border: "1px solid var(--rule)", borderRadius: 6, minWidth: 180 }} />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <label style={{ fontSize: 12, color: "var(--ink-faint)" }}>Mês</label>
+          <input type="month" value={mes} onChange={(e) => setMes(e.target.value)} style={{ padding: "6px 8px", border: "1px solid var(--rule)", borderRadius: 6 }} />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <label style={{ fontSize: 12, color: "var(--ink-faint)" }}>Data do aporte</label>
+          <input type="date" value={data} onChange={(e) => setData(e.target.value)} style={{ padding: "6px 8px", border: "1px solid var(--rule)", borderRadius: 6 }} />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <label style={{ fontSize: 12, color: "var(--ink-faint)" }}>Valor (R$)</label>
           <input type="number" step="0.01" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" style={{ padding: "6px 8px", border: "1px solid var(--rule)", borderRadius: 6, width: 140 }} />
         </div>
         <button type="submit" disabled={salvando} style={{ padding: "8px 16px", background: "var(--accent)", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600 }}>
@@ -446,6 +507,7 @@ export default function Importar() {
         <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Saldos de investimento</h2>
         <ImportarPrintForm tickers={tickersInvestimento} onSalvo={carregarInvestMonths} />
         <AtualizarSaldoForm tickers={tickersInvestimento} onSalvo={carregarInvestMonths} />
+        <RegistrarAporteForm tickers={tickersInvestimento} onSalvo={carregarInvestMonths} />
       </div>
 
       {/* ========== NFS-e (MEI) ========== */}

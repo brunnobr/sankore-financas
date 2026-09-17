@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Wallet, TrendingUp, TrendingDown, PiggyBank } from "lucide-react";
 import { loadTransacoes } from "../data/transactions.js";
+import { loadMonths } from "../data/investments.js";
 import { getCategoriasMap } from "../data/settings.js";
 import { agregarTx, categoriasDespesa, categoriasReceita, categoriasAporte, avaliarGastos, variacaoPct } from "../lib/finance/categorization.js";
 import { brl, labelMes } from "../lib/finance/format.js";
@@ -19,11 +20,13 @@ export default function Dashboard() {
   const [categoriasMap, setCategoriasMap] = useState(null);
   const [erro, setErro] = useState("");
   const [mesSelecionado, setMesSelecionado] = useState("");
+  const [investMonths, setInvestMonths] = useState([]);
 
   useEffect(() => {
     Promise.all([loadTransacoes(), getCategoriasMap()])
       .then(([t, c]) => { setTransacoes(t); setCategoriasMap(c); })
       .catch((e) => setErro(e.message));
+    loadMonths().then(setInvestMonths).catch(() => setInvestMonths([]));
   }, []);
 
   const pronto = transacoes && categoriasMap;
@@ -49,6 +52,19 @@ export default function Dashboard() {
   const despesasPorCategoria = agAtual ? categoriasDespesa(agAtual, categoriasMap) : [];
   const receitasPorCategoria = agAtual ? categoriasReceita(agAtual, categoriasMap) : [];
   const aportePorCategoria = agAtual ? categoriasAporte(agAtual, categoriasMap) : [];
+
+  // Para qual ativo específico foi o aporte do mês (contributions.breakdown,
+  // já usado em Investimentos > Retorno por ativo) — mesAtual é "YYYY-MM",
+  // o mês de investimento é "YYYY-MM-01".
+  const aportePorAtivo = useMemo(() => {
+    const mes = investMonths.find((m) => m.key.slice(0, 7) === mesAtual);
+    const breakdown = mes?.aportes?.ativoBreakdown;
+    if (!breakdown || typeof breakdown !== "object") return [];
+    return Object.entries(breakdown)
+      .map(([ticker, info]) => ({ ticker, valor: Number(info?.valor) || 0 }))
+      .filter((a) => a.valor !== 0)
+      .sort((a, b) => b.valor - a.valor);
+  }, [investMonths, mesAtual]);
   const insights = agAtual ? avaliarGastos(agAtual, agAnterior, categoriasMap) : [];
 
   const varReceita = agAtual && agAnterior ? variacaoPct(agAtual.receita, agAnterior.receita) : null;
@@ -142,6 +158,22 @@ export default function Dashboard() {
               ))}
             </tbody>
           </table>
+
+          {aportePorAtivo.length > 0 && (
+            <>
+              <p style={{ fontSize: 11.5, color: "var(--ink-faint)", margin: "14px 0 6px" }}>Foi para qual ativo:</p>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <tbody>
+                  {aportePorAtivo.map((a) => (
+                    <tr key={a.ticker} style={{ borderBottom: "1px solid var(--rule)" }}>
+                      <td style={{ padding: "6px 4px" }}>{a.ticker}</td>
+                      <td style={{ padding: "6px 4px", textAlign: "right", color: a.valor >= 0 ? "var(--credit)" : "var(--debit)" }}>{brl(a.valor)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
         </Panel>
       )}
     </div>

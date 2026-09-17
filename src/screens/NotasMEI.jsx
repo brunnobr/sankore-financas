@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Receipt, AlertTriangle, CheckCircle2, Clock } from "lucide-react";
-import { loadNFSeConfirmadas, marcarPagamento } from "../data/nfse.js";
-import { resumoTetoMei } from "../data/nfse.js";
+import { loadNFSeConfirmadas, marcarRecebido, marcarAguardando, resumoTetoMei } from "../data/nfse.js";
+import { loadTransacoes } from "../data/transactions.js";
 import { brl, pct, formatarDataBR } from "../lib/finance/format.js";
 import { Panel, StatCard, Badge } from "./shared/ui.jsx";
 
@@ -35,22 +35,46 @@ function TetoMei({ resumo }) {
 
 export default function NotasMEI() {
   const [notas, setNotas] = useState(null);
+  const [transacoes, setTransacoes] = useState([]);
   const [resumo, setResumo] = useState(null);
   const [erro, setErro] = useState("");
   const [processando, setProcessando] = useState(null);
+  const [vinculando, setVinculando] = useState(null); // id da nota com o seletor de extrato aberto
 
   function carregar() {
-    Promise.all([loadNFSeConfirmadas(), resumoTetoMei(anoAtual)])
-      .then(([n, r]) => { setNotas(n); setResumo(r); })
+    Promise.all([loadNFSeConfirmadas(), resumoTetoMei(anoAtual), loadTransacoes()])
+      .then(([n, r, t]) => { setNotas(n); setResumo(r); setTransacoes(t); })
       .catch((e) => setErro(e.message || "Erro ao carregar notas."));
   }
 
   useEffect(() => { carregar(); }, []);
 
-  async function alternarPagamento(id, statusAtual) {
+  // Lançamentos de crédito no extrato com o mesmo valor da nota — é assim
+  // que se sabe que aquele recebimento é dessa NFe específica.
+  function candidatos(nota) {
+    const valor = Number(nota.valor);
+    return transacoes
+      .filter((t) => t.valor > 0 && Math.abs(t.valor - valor) < 0.01)
+      .sort((a, b) => Math.abs(new Date(a.data) - new Date(nota.competencia)) - Math.abs(new Date(b.data) - new Date(nota.competencia)));
+  }
+
+  async function vincular(id, transacao) {
+    setProcessando(id);
+    setVinculando(null);
+    try {
+      await marcarRecebido(id, { dataISO: transacao.data, banco: transacao.banco });
+      carregar();
+    } catch (e) {
+      setErro(e.message || "Erro ao vincular recebimento.");
+    } finally {
+      setProcessando(null);
+    }
+  }
+
+  async function desvincular(id) {
     setProcessando(id);
     try {
-      await marcarPagamento(id, statusAtual === "recebido" ? "aguardando" : "recebido");
+      await marcarAguardando(id);
       carregar();
     } catch (e) {
       setErro(e.message || "Erro ao atualizar pagamento.");
@@ -91,18 +115,48 @@ export default function NotasMEI() {
                     <td style={{ padding: "8px 4px" }}>{n.tomador}</td>
                     <td style={{ padding: "8px 4px", textAlign: "right" }}>{brl(Number(n.valor))}</td>
                     <td style={{ padding: "8px 4px" }}>
-                      <button
-                        onClick={() => alternarPagamento(n.id, n.recebimento_iso ? "recebido" : "aguardando")}
-                        disabled={processando === n.id}
-                        style={{ background: "transparent", border: "none", padding: 0, cursor: "pointer" }}
-                        title="Clique para alternar"
-                      >
-                        {n.recebimento_iso ? (
-                          <Badge tom="credit"><CheckCircle2 size={11} style={{ marginRight: 4, marginBottom: -1 }} />Recebido em {formatarDataBR(n.recebimento_iso)}</Badge>
-                        ) : (
-                          <Badge tom="faint"><Clock size={11} style={{ marginRight: 4, marginBottom: -1 }} />Aguardando</Badge>
-                        )}
-                      </button>
+                      {n.recebimento_iso ? (
+                        <button
+                          onClick={() => desvincular(n.id)}
+                          disabled={processando === n.id}
+                          style={{ background: "transparent", border: "none", padding: 0, cursor: "pointer" }}
+                          title="Clique para desvincular"
+                        >
+                          <Badge tom="credit"><CheckCircle2 size={11} style={{ marginRight: 4, marginBottom: -1 }} />Recebido em {formatarDataBR(n.recebimento_iso)}{n.conta_recebimento ? ` (${n.conta_recebimento})` : ""}</Badge>
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => setVinculando(vinculando === n.id ? null : n.id)}
+                            disabled={processando === n.id}
+                            style={{ background: "transparent", border: "none", padding: 0, cursor: "pointer" }}
+                          >
+                            <Badge tom="faint"><Clock size={11} style={{ marginRight: 4, marginBottom: -1 }} />Aguardando</Badge>
+                          </button>
+                          {vinculando === n.id && (
+                            <div style={{ marginTop: 6, fontSize: 12, background: "var(--bg)", border: "1px solid var(--rule)", borderRadius: 6, padding: 8, minWidth: 220 }}>
+                              {candidatos(n).length === 0 ? (
+                                <span style={{ color: "var(--ink-faint)" }}>Nenhum lançamento de {brl(Number(n.valor))} no extrato ainda.</span>
+                              ) : (
+                                <>
+                                  <div style={{ color: "var(--ink-faint)", marginBottom: 4 }}>Vincular ao lançamento:</div>
+                                  {candidatos(n).map((t) => (
+                                    <div
+                                      key={t.id}
+                                      onClick={() => vincular(n.id, t)}
+                                      style={{ padding: "4px 6px", cursor: "pointer", borderRadius: 4 }}
+                                      onMouseEnter={(e) => (e.currentTarget.style.background = "var(--sidebar-active-bg)")}
+                                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                                    >
+                                      {formatarDataBR(t.data)} — {t.banco} — {brl(t.valor)}
+                                    </div>
+                                  ))}
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))}
