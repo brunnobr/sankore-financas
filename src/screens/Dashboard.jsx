@@ -31,10 +31,16 @@ export default function Dashboard() {
 
   const pronto = transacoes && categoriasMap;
 
+  // Une os meses do extrato com os meses que só têm aporte registrado
+  // (nota de corretagem/print/manual) — o aporte de um mês pode existir
+  // antes do extrato bancário daquele mês ser importado, e sem isso o
+  // mês nem aparecia como opção pra selecionar.
   const meses = useMemo(() => {
     if (!pronto) return [];
-    return [...new Set(transacoes.map((t) => mesDe(t.data)))].sort();
-  }, [pronto, transacoes]);
+    const doExtrato = transacoes.map((t) => mesDe(t.data));
+    const doInvest = investMonths.map((m) => m.key.slice(0, 7));
+    return [...new Set([...doExtrato, ...doInvest])].sort();
+  }, [pronto, transacoes, investMonths]);
 
   const mesAtual = mesSelecionado && meses.includes(mesSelecionado) ? mesSelecionado : meses[meses.length - 1];
   const mesAnterior = meses[meses.indexOf(mesAtual) - 1];
