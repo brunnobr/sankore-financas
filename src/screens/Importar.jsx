@@ -142,6 +142,7 @@ function ImportarCorretagemForm({ tickers, onSalvo }) {
     <Panel title="Importar nota de corretagem">
       <p style={{ fontSize: 13, color: "var(--ink-faint)", marginTop: -8, marginBottom: 12 }}>
         Sobe o PDF da nota — lê os negócios do pregão, você confere/corrige o ativo e confirma antes de gravar como aporte do mês.
+        O nome pode sair grudado com o código do segmento (ex: "CI WRLD11") — corrija pro ticker certo aqui embaixo; a correção fica salva e a próxima nota com esse mesmo texto já vem certa.
       </p>
       <input type="file" accept="application/pdf" onChange={onArquivo} disabled={lendo || salvando} />
       {lendo && <span style={{ marginLeft: 10, fontSize: 13, color: "var(--ink-faint)" }}>Lendo a nota…</span>}
