@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { parseNFSeXML, validarNFSe, gerarHashDedup } from '../lib/nfse-parser';
-import { supabase } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../data/supabaseClient';
+import { useAuth } from '../data/AuthContext';
 
 export function NFSeUpload() {
-  const { user } = useAuth();
+  const auth = useAuth();
+  const user = auth?.session?.user;
   const [step, setStep] = useState('upload'); // upload | preview | saving | done
   const [file, setFile] = useState(null);
   const [nfse, setNfse] = useState(null);
