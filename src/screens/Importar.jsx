@@ -5,8 +5,8 @@ import { loadRegrasUsuario, salvarRegraCategorizacao, importarTransacoes, regist
 import { getCategoriasMap, getPalavrasCategoria } from "../data/settings.js";
 import { normalizar, brl, formatarDataBR, labelMes } from "../lib/finance/format.js";
 import { Panel } from "./shared/ui.jsx";
-import { NFSeUpload } from "../components/NFSeUpload.jsx";
-import { NFSeReviewQueue } from "../components/NFSeReviewQueue.jsx";
+import { NFSeUpload } from "../components/NFSeUpload";
+import { NFSeReviewQueue } from "../components/NFSeReviewQueue";
 
 /* Mês mais frequente entre as datas — usado como "competência" do
    extrato pro checklist (um extrato normalmente cobre um mês; se cruzar
