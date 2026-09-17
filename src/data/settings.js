@@ -1,5 +1,5 @@
 import { supabase } from "./supabaseClient.js";
-import { ASSET_GROUP_SEED, ASSET_TIPO_SEED, CATEGORIAS_SEED } from "../lib/finance/taxonomy.js";
+import { ASSET_GROUP_SEED, ASSET_TIPO_SEED, CATEGORIAS_SEED, TETO_MEI_SEED } from "../lib/finance/taxonomy.js";
 import { PALAVRAS_CATEGORIA_SEED } from "../lib/finance/categorization.js";
 
 /* Camada de configuração — substitui as constantes hardcoded ASSET_GROUP/
@@ -27,6 +27,8 @@ export const getAssetGroupMap = () => getOrSeedSetting("asset_group", ASSET_GROU
 export const getAssetTipoMap = () => getOrSeedSetting("asset_tipo", ASSET_TIPO_SEED);
 export const getCategoriasMap = () => getOrSeedSetting("categorias", CATEGORIAS_SEED);
 export const getPalavrasCategoria = () => getOrSeedSetting("palavras_categoria", PALAVRAS_CATEGORIA_SEED);
+
+export const getTetoMeiMap = () => getOrSeedSetting("teto_mei", TETO_MEI_SEED);
 
 export async function updateSetting(chave, valor) {
   const { data: userData } = await supabase.auth.getUser();

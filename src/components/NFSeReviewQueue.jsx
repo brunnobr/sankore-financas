@@ -1,55 +1,32 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, AlertCircle, Trash2 } from "lucide-react";
-import { supabase } from "../data/supabaseClient";
+import { CheckCircle2, Trash2 } from "lucide-react";
 import { useAuth } from "../data/AuthContext";
+import { loadFilaRevisao, confirmarNFSe, rejeitarNFSe } from "../data/nfse.js";
+import { brl, formatarDataBR } from "../lib/finance/format.js";
+import { Panel } from "../screens/shared/ui.jsx";
 
 export function NFSeReviewQueue() {
   const auth = useAuth();
   const user = auth?.session?.user;
-  
-  const [queue, setQueue] = useState([]);
-  const [carregando, setCarregando] = useState(true);
+
+  const [fila, setFila] = useState(null);
   const [erro, setErro] = useState("");
   const [processando, setProcessando] = useState(null);
 
   useEffect(() => {
-    if (!user) {
-      setCarregando(false);
-      return;
-    }
-    carregarQueue();
+    if (!user) return;
+    carregar();
   }, [user]);
 
-  async function carregarQueue() {
-    try {
-      setCarregando(true);
-      const { data, error } = await supabase
-        .from("nfse")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("status", "pendente")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setQueue(data || []);
-    } catch (e) {
-      setErro(`Erro ao carregar fila: ${e.message}`);
-    } finally {
-      setCarregando(false);
-    }
+  function carregar() {
+    loadFilaRevisao().then(setFila).catch((e) => setErro(`Erro ao carregar fila: ${e.message}`));
   }
 
   async function confirmar(id) {
     setProcessando(id);
     try {
-      const { error } = await supabase
-        .from("nfse")
-        .update({ status: "confirmada" })
-        .eq("id", id)
-        .eq("user_id", user.id);
-
-      if (error) throw error;
-      carregarQueue();
+      await confirmarNFSe(id);
+      carregar();
     } catch (e) {
       setErro(`Erro ao confirmar: ${e.message}`);
     } finally {
@@ -60,14 +37,8 @@ export function NFSeReviewQueue() {
   async function rejeitar(id) {
     setProcessando(id);
     try {
-      const { error } = await supabase
-        .from("nfse")
-        .update({ status: "rejeitada" })
-        .eq("id", id)
-        .eq("user_id", user.id);
-
-      if (error) throw error;
-      carregarQueue();
+      await rejeitarNFSe(id);
+      carregar();
     } catch (e) {
       setErro(`Erro ao rejeitar: ${e.message}`);
     } finally {
@@ -75,27 +46,16 @@ export function NFSeReviewQueue() {
     }
   }
 
-  if (!user) {
-    return <p style={{ color: "var(--ink-faint)", fontSize: 13 }}>Faça login para ver a fila de revisão.</p>;
-  }
-
-  if (carregando) {
-    return <p style={{ color: "var(--ink-faint)", fontSize: 13 }}>Carregando fila…</p>;
-  }
-
-  if (queue.length === 0) {
-    return <p style={{ color: "var(--ink-faint)", fontSize: 13 }}>Nenhuma nota fiscal pendente.</p>;
-  }
+  if (!user || !fila || fila.length === 0) return null;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {erro && <p style={{ color: "var(--debit)", marginBottom: 0 }}>{erro}</p>}
-      
+    <Panel title={`NFS-e pendentes de revisão (${fila.length})`}>
+      {erro && <p style={{ color: "var(--debit)", marginBottom: 8 }}>{erro}</p>}
       <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
           <thead>
             <tr style={{ textAlign: "left", borderBottom: "1px solid var(--rule)", color: "var(--ink-faint)" }}>
-              <th style={{ padding: "8px 4px" }}>Data</th>
+              <th style={{ padding: "8px 4px" }}>Competência</th>
               <th style={{ padding: "8px 4px" }}>Tomador</th>
               <th style={{ padding: "8px 4px", textAlign: "right" }}>Valor</th>
               <th style={{ padding: "8px 4px" }}>Descrição</th>
@@ -103,31 +63,20 @@ export function NFSeReviewQueue() {
             </tr>
           </thead>
           <tbody>
-            {queue.map((item) => (
-              <tr key={item.id} style={{ borderBottom: "1px solid var(--rule)" }}>
-                <td style={{ padding: "8px 4px", whiteSpace: "nowrap" }}>
-                  {new Date(item.data_emissao).toLocaleDateString("pt-BR")}
-                </td>
-                <td style={{ padding: "8px 4px" }}>{item.tomador_nome}</td>
-                <td style={{ padding: "8px 4px", textAlign: "right", color: "var(--credit)" }}>
-                  R$ {(item.valor / 100).toFixed(2).replace(".", ",")}
-                </td>
+            {fila.map((item) => (
+              <tr key={item.id} style={{ borderBottom: "1px solid var(--rule)", opacity: processando === item.id ? 0.5 : 1 }}>
+                <td style={{ padding: "8px 4px", whiteSpace: "nowrap" }}>{formatarDataBR(item.competencia)}</td>
+                <td style={{ padding: "8px 4px" }}>{item.tomador}</td>
+                <td style={{ padding: "8px 4px", textAlign: "right", color: "var(--credit)" }}>{brl(Number(item.valor))}</td>
                 <td style={{ padding: "8px 4px", fontSize: 11, color: "var(--ink-faint)" }}>
-                  {item.descricao_servico?.slice(0, 40)}…
+                  {item.descricao ? `${item.descricao.slice(0, 40)}…` : "—"}
                 </td>
                 <td style={{ padding: "8px 4px", textAlign: "center", display: "flex", gap: 4, justifyContent: "center" }}>
                   <button
                     onClick={() => confirmar(item.id)}
                     disabled={processando === item.id}
                     title="Confirmar"
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      padding: 4,
-                      cursor: "pointer",
-                      color: "var(--credit)",
-                      display: "flex",
-                    }}
+                    style={{ background: "transparent", border: "none", padding: 4, cursor: "pointer", color: "var(--credit)", display: "flex" }}
                   >
                     <CheckCircle2 size={14} />
                   </button>
@@ -135,14 +84,7 @@ export function NFSeReviewQueue() {
                     onClick={() => rejeitar(item.id)}
                     disabled={processando === item.id}
                     title="Rejeitar"
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      padding: 4,
-                      cursor: "pointer",
-                      color: "var(--debit)",
-                      display: "flex",
-                    }}
+                    style={{ background: "transparent", border: "none", padding: 4, cursor: "pointer", color: "var(--debit)", display: "flex" }}
                   >
                     <Trash2 size={14} />
                   </button>
@@ -152,6 +94,6 @@ export function NFSeReviewQueue() {
           </tbody>
         </table>
       </div>
-    </div>
+    </Panel>
   );
 }

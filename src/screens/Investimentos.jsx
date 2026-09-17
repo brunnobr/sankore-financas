@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, Legend,
 } from "recharts";
-import { Landmark, PiggyBank, Wallet, Percent, Sparkles } from "lucide-react";
-import { loadMonths, salvarSnapshotAtivo, extrairSaldosDePrint } from "../data/investments.js";
+import { Landmark, PiggyBank, Wallet, Percent } from "lucide-react";
+import { loadMonths } from "../data/investments.js";
 import { getAssetGroupMap, getAssetTipoMap, updateSetting } from "../data/settings.js";
 import { GRUPO, TIPO } from "../lib/finance/taxonomy.js";
 import {
@@ -84,196 +84,14 @@ function GerenciarAtivos({ tickers, assetGroupMap, assetTipoMap, onAtualizado })
   );
 }
 
-/* Ativo sem extrato baixável (Banco Inter, cripto, cofrinhos...): o
-   usuário lê o saldo de um print e registra aqui — upsert por mês, então
-   reenviar o mesmo mês só corrige o valor. */
-function AtualizarSaldoForm({ tickers, onSalvo }) {
-  const hoje = new Date().toISOString().slice(0, 7);
-  const [ticker, setTicker] = useState("");
-  const [mes, setMes] = useState(hoje);
-  const [valor, setValor] = useState("");
-  const [salvando, setSalvando] = useState(false);
-  const [erro, setErro] = useState("");
-
-  async function onSubmit(e) {
-    e.preventDefault();
-    if (!ticker.trim() || !mes || valor === "") return;
-    setSalvando(true);
-    setErro("");
-    try {
-      await salvarSnapshotAtivo({ ticker: ticker.trim(), mes: `${mes}-01`, valor: Number(valor) });
-      setTicker("");
-      setValor("");
-      onSalvo();
-    } catch (e2) {
-      setErro(e2.message || "Erro ao salvar saldo.");
-    } finally {
-      setSalvando(false);
-    }
-  }
-
-  return (
-    <Panel title="Atualizar saldo manualmente">
-      <p style={{ fontSize: 13, color: "var(--ink-faint)", marginTop: -8, marginBottom: 12 }}>
-        Para ativos sem extrato baixável (ex: investimentos do Banco Inter) — registra o fechamento do mês a partir do que você vê no app/print.
-      </p>
-      <form onSubmit={onSubmit} style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <label style={{ fontSize: 12, color: "var(--ink-faint)" }}>Ativo</label>
-          <input list="tickers-existentes" value={ticker} onChange={(e) => setTicker(e.target.value)} placeholder="ex: INTER FIRF" style={{ padding: "6px 8px", border: "1px solid var(--rule)", borderRadius: 6, minWidth: 180 }} />
-          <datalist id="tickers-existentes">
-            {tickers.map((t) => <option key={t} value={t} />)}
-          </datalist>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <label style={{ fontSize: 12, color: "var(--ink-faint)" }}>Mês</label>
-          <input type="month" value={mes} onChange={(e) => setMes(e.target.value)} style={{ padding: "6px 8px", border: "1px solid var(--rule)", borderRadius: 6 }} />
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <label style={{ fontSize: 12, color: "var(--ink-faint)" }}>Saldo (R$)</label>
-          <input type="number" step="0.01" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" style={{ padding: "6px 8px", border: "1px solid var(--rule)", borderRadius: 6, width: 140 }} />
-        </div>
-        <button type="submit" disabled={salvando} style={{ padding: "8px 16px", background: "var(--accent)", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600 }}>
-          {salvando ? "Salvando…" : "Salvar"}
-        </button>
-      </form>
-      {erro && <p style={{ color: "var(--debit)", marginBottom: 0, marginTop: 8 }}>{erro}</p>}
-    </Panel>
-  );
-}
-
-function fileParaBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(",")[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-/* Importa saldos por print da tela do banco — sobe 1+ capturas, a Edge
-   Function chama a API da Claude e devolve os pares ativo/valor, que
-   caem numa fila de revisão (igual ao import de extrato) antes de
-   gravar em asset_snapshots. */
-function ImportarPrintForm({ tickers, onSalvo }) {
-  const hoje = new Date().toISOString().slice(0, 7);
-  const [mes, setMes] = useState(hoje);
-  const [extraindo, setExtraindo] = useState(false);
-  const [salvando, setSalvando] = useState(false);
-  const [itens, setItens] = useState(null);
-  const [erro, setErro] = useState("");
-
-  async function onArquivos(e) {
-    const files = [...e.target.files];
-    e.target.value = "";
-    if (!files.length) return;
-    setErro("");
-    setItens(null);
-    setExtraindo(true);
-    try {
-      const imagens = await Promise.all(files.map(async (f) => ({ data: await fileParaBase64(f), mediaType: f.type || "image/jpeg" })));
-      const extraidos = await extrairSaldosDePrint(imagens);
-      if (!extraidos.length) { setErro("Não consegui reconhecer nenhum ativo nesses prints."); return; }
-      setItens(extraidos.map((it) => ({ ...it, incluir: true })));
-    } catch (e2) {
-      setErro(e2.message || "Erro ao extrair os saldos.");
-    } finally {
-      setExtraindo(false);
-    }
-  }
-
-  function atualizarItem(i, campo, valor) {
-    setItens((prev) => prev.map((it, idx) => (idx === i ? { ...it, [campo]: valor } : it)));
-  }
-
-  async function confirmar() {
-    setSalvando(true);
-    setErro("");
-    try {
-      const incluidos = itens.filter((it) => it.incluir);
-      await Promise.all(incluidos.map((it) => salvarSnapshotAtivo({ ticker: it.nome.trim(), mes: `${mes}-01`, valor: Number(it.valor) })));
-      setItens(null);
-      onSalvo();
-    } catch (e2) {
-      setErro(e2.message || "Erro ao salvar os saldos.");
-    } finally {
-      setSalvando(false);
-    }
-  }
-
-  return (
-    <Panel title="Importar por print">
-      <p style={{ fontSize: 13, color: "var(--ink-faint)", marginTop: -8, marginBottom: 12 }}>
-        Sobe uma ou mais capturas de tela do app do banco — a IA lê os ativos e saldos, você confere e confirma antes de gravar.
-      </p>
-      <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <label style={{ fontSize: 12, color: "var(--ink-faint)" }}>Mês do fechamento</label>
-          <input type="month" value={mes} onChange={(e) => setMes(e.target.value)} style={{ padding: "6px 8px", border: "1px solid var(--rule)", borderRadius: 6 }} />
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <label style={{ fontSize: 12, color: "var(--ink-faint)" }}>Prints</label>
-          <input type="file" accept="image/*" multiple onChange={onArquivos} disabled={extraindo || salvando} />
-        </div>
-        {extraindo && (
-          <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--ink-faint)" }}>
-            <Sparkles size={14} strokeWidth={2} /> Lendo os prints…
-          </span>
-        )}
-      </div>
-
-      {erro && <p style={{ color: "var(--debit)", marginTop: 12, marginBottom: 0 }}>{erro}</p>}
-
-      {itens && itens.length > 0 && (
-        <div style={{ marginTop: 16 }}>
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-              <thead>
-                <tr style={{ textAlign: "left", borderBottom: "1px solid var(--rule)", color: "var(--ink-faint)" }}>
-                  <th style={{ padding: "6px 4px" }}></th>
-                  <th style={{ padding: "6px 4px" }}>Ativo</th>
-                  <th style={{ padding: "6px 4px", textAlign: "right" }}>Valor</th>
-                </tr>
-              </thead>
-              <tbody>
-                {itens.map((it, i) => (
-                  <tr key={i} style={{ borderBottom: "1px solid var(--rule)", opacity: it.incluir ? 1 : 0.4 }}>
-                    <td style={{ padding: "8px 4px" }}>
-                      <input type="checkbox" checked={it.incluir} onChange={(e) => atualizarItem(i, "incluir", e.target.checked)} />
-                    </td>
-                    <td style={{ padding: "8px 4px" }}>
-                      <input list="tickers-existentes-print" value={it.nome} onChange={(e) => atualizarItem(i, "nome", e.target.value)} style={{ padding: "4px 8px", border: "1px solid var(--rule)", borderRadius: 6, minWidth: 180 }} />
-                    </td>
-                    <td style={{ padding: "8px 4px", textAlign: "right" }}>
-                      <input type="number" step="0.01" value={it.valor} onChange={(e) => atualizarItem(i, "valor", e.target.value)} style={{ padding: "4px 8px", border: "1px solid var(--rule)", borderRadius: 6, width: 120, textAlign: "right" }} />
-                      {it.moeda === "USD" && <span style={{ marginLeft: 6, fontSize: 11, color: "var(--debit)" }}>USD — converta pra R$</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <datalist id="tickers-existentes-print">
-            {tickers.map((t) => <option key={t} value={t} />)}
-          </datalist>
-          <button
-            onClick={confirmar}
-            disabled={salvando || !itens.some((it) => it.incluir)}
-            style={{ marginTop: 16, padding: "10px 20px", background: "var(--accent)", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600 }}
-          >
-            {salvando ? "Salvando…" : `Confirmar e gravar ${itens.filter((it) => it.incluir).length} ativo(s)`}
-          </button>
-        </div>
-      )}
-    </Panel>
-  );
-}
-
 export default function Investimentos() {
   const [months, setMonths] = useState(null);
   const [assetGroupMap, setAssetGroupMap] = useState(null);
   const [assetTipoMap, setAssetTipoMap] = useState(null);
   const [erro, setErro] = useState("");
+  const [mesIndex, setMesIndex] = useState(null); // índice em `months`; null = último
+  const [filtroGrupo, setFiltroGrupo] = useState("TODOS");
+  const [tipoGrafico, setTipoGrafico] = useState("linha"); // linha | barra | area
 
   async function carregar() {
     try {
@@ -292,12 +110,14 @@ export default function Investimentos() {
 
   const pronto = months && assetGroupMap && assetTipoMap;
 
-  const latest = pronto && months.length ? months[months.length - 1] : null;
-  const prev = pronto && months.length > 1 ? months[months.length - 2] : null;
+  const idxSelecionado = pronto && months.length ? (mesIndex ?? months.length - 1) : null;
+  const latest = pronto && idxSelecionado != null ? months[idxSelecionado] : null;
+  const prev = pronto && idxSelecionado != null && idxSelecionado > 0 ? months[idxSelecionado - 1] : null;
 
   const grupos = pronto && latest ? gruposDoMes(assetGroupMap, latest) : [];
   const tipos = pronto && latest ? tiposDoMes(assetTipoMap, latest) : [];
-  const linhas = pronto && latest ? retornosPorAtivo(assetGroupMap, prev, latest) : [];
+  const linhasTodas = pronto && latest ? retornosPorAtivo(assetGroupMap, prev, latest) : [];
+  const linhas = filtroGrupo === "TODOS" ? linhasTodas : linhasTodas.filter((l) => l.grupo === filtroGrupo);
   const retorno = pronto && latest ? retornoMes(assetGroupMap, prev, latest) : null;
 
   const evolucao = useMemo(() => {
@@ -322,13 +142,11 @@ export default function Investimentos() {
 
   if (erro) return <p style={{ color: "var(--debit)" }}>{erro}</p>;
   if (!pronto) return <p style={{ color: "var(--ink-faint)" }}>Carregando…</p>;
-  if (!latest) {
+  if (!months.length) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-        <Panel><p style={{ color: "var(--ink-faint)", margin: 0 }}>Nenhum fechamento de mês cadastrado ainda.</p></Panel>
+        <Panel><p style={{ color: "var(--ink-faint)", margin: 0 }}>Nenhum fechamento de mês cadastrado ainda — registre um saldo em Importar.</p></Panel>
         <GerenciarAtivos tickers={tickers} assetGroupMap={assetGroupMap} assetTipoMap={assetTipoMap} onAtualizado={onAtualizadoClassificacao} />
-        <ImportarPrintForm tickers={tickers} onSalvo={carregar} />
-        <AtualizarSaldoForm tickers={tickers} onSalvo={carregar} />
       </div>
     );
   }
@@ -337,7 +155,17 @@ export default function Investimentos() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <p style={{ color: "var(--ink-faint)", fontSize: 13, margin: 0 }}>Fechamento de {labelMes(latest.key)}</p>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <p style={{ color: "var(--ink-faint)", fontSize: 13, margin: 0 }}>Fechamento de</p>
+        <select value={idxSelecionado} onChange={(e) => setMesIndex(Number(e.target.value))} style={selectStyle}>
+          {months.map((m, i) => <option key={m.key} value={i}>{labelMes(m.key)}</option>)}
+        </select>
+        <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--ink-faint)" }}>Filtrar por grupo:</span>
+        <select value={filtroGrupo} onChange={(e) => setFiltroGrupo(e.target.value)} style={selectStyle}>
+          <option value="TODOS">Todos</option>
+          {Object.entries(GRUPO).map(([g, info]) => <option key={g} value={g}>{info.label}</option>)}
+        </select>
+      </div>
 
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
         <StatCard icon={Landmark} cor="green" rotulo="Patrimônio total" valor={brl(patrimonioTotal)} />
@@ -355,17 +183,48 @@ export default function Investimentos() {
       </div>
 
       <Panel title="Evolução patrimonial">
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+          <select value={tipoGrafico} onChange={(e) => setTipoGrafico(e.target.value)} style={selectStyle}>
+            <option value="linha">Linha</option>
+            <option value="barra">Barra</option>
+            <option value="area">Área</option>
+          </select>
+        </div>
         <ResponsiveContainer width="100%" height={240}>
-          <LineChart data={evolucao}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--rule)" />
-            <XAxis dataKey="mes" stroke="var(--ink-faint)" fontSize={12} />
-            <YAxis stroke="var(--ink-faint)" fontSize={12} tickFormatter={(v) => brl(v)} width={90} />
-            <Tooltip formatter={(v) => brl(v)} />
-            <Legend />
-            <Line type="monotone" dataKey="total" name="Total" stroke="var(--ink)" strokeWidth={2} dot />
-            <Line type="monotone" dataKey="investido" name="Investido" stroke="var(--credit)" strokeWidth={2} dot />
-            <Line type="monotone" dataKey="caixa" name="Caixa" stroke="var(--blue)" strokeWidth={1.5} dot />
-          </LineChart>
+          {tipoGrafico === "barra" ? (
+            <BarChart data={evolucao}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--rule)" />
+              <XAxis dataKey="mes" stroke="var(--ink-faint)" fontSize={12} />
+              <YAxis stroke="var(--ink-faint)" fontSize={12} tickFormatter={(v) => brl(v)} width={90} />
+              <Tooltip formatter={(v) => brl(v)} />
+              <Legend />
+              <Bar dataKey="total" name="Total" fill="var(--ink)" />
+              <Bar dataKey="investido" name="Investido" fill="var(--credit)" />
+              <Bar dataKey="caixa" name="Caixa" fill="var(--blue)" />
+            </BarChart>
+          ) : tipoGrafico === "area" ? (
+            <AreaChart data={evolucao}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--rule)" />
+              <XAxis dataKey="mes" stroke="var(--ink-faint)" fontSize={12} />
+              <YAxis stroke="var(--ink-faint)" fontSize={12} tickFormatter={(v) => brl(v)} width={90} />
+              <Tooltip formatter={(v) => brl(v)} />
+              <Legend />
+              <Area type="monotone" dataKey="total" name="Total" stroke="var(--ink)" fill="var(--ink)" fillOpacity={0.15} />
+              <Area type="monotone" dataKey="investido" name="Investido" stroke="var(--credit)" fill="var(--credit)" fillOpacity={0.15} />
+              <Area type="monotone" dataKey="caixa" name="Caixa" stroke="var(--blue)" fill="var(--blue)" fillOpacity={0.15} />
+            </AreaChart>
+          ) : (
+            <LineChart data={evolucao}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--rule)" />
+              <XAxis dataKey="mes" stroke="var(--ink-faint)" fontSize={12} />
+              <YAxis stroke="var(--ink-faint)" fontSize={12} tickFormatter={(v) => brl(v)} width={90} />
+              <Tooltip formatter={(v) => brl(v)} />
+              <Legend />
+              <Line type="monotone" dataKey="total" name="Total" stroke="var(--ink)" strokeWidth={2} dot />
+              <Line type="monotone" dataKey="investido" name="Investido" stroke="var(--credit)" strokeWidth={2} dot />
+              <Line type="monotone" dataKey="caixa" name="Caixa" stroke="var(--blue)" strokeWidth={1.5} dot />
+            </LineChart>
+          )}
         </ResponsiveContainer>
       </Panel>
 
@@ -411,7 +270,7 @@ export default function Investimentos() {
             {linhas.map((l) => (
               <tr key={l.nome} style={{ borderBottom: "1px solid var(--rule)" }}>
                 <td style={{ padding: "8px 4px" }}>{l.nome}</td>
-                <td style={{ padding: "8px 4px", color: "var(--ink-faint)" }}>{l.grupo}</td>
+                <td style={{ padding: "8px 4px", color: "var(--ink-faint)" }}>{GRUPO[l.grupo]?.label || l.grupo}</td>
                 <td style={{ padding: "8px 4px", textAlign: "right" }}>{brl(l.valor)}</td>
                 <td style={{ padding: "8px 4px", textAlign: "right", color: l.rendPct == null ? "var(--ink-faint)" : l.rendPct >= 0 ? "var(--credit)" : "var(--debit)" }}>
                   {l.rendPct == null ? "—" : pct(l.rendPct)}
@@ -424,9 +283,6 @@ export default function Investimentos() {
       </Panel>
 
       <GerenciarAtivos tickers={tickers} assetGroupMap={assetGroupMap} assetTipoMap={assetTipoMap} onAtualizado={onAtualizadoClassificacao} />
-
-      <ImportarPrintForm tickers={tickers} onSalvo={carregar} />
-      <AtualizarSaldoForm tickers={tickers} onSalvo={carregar} />
     </div>
   );
 }

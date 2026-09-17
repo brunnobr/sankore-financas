@@ -27,17 +27,31 @@ export const TIPO = {
 export const ORDEM_TIPO = ["RENDA_FIXA", "CAIXA", "ETF", "ACOES_BR", "BOND_USD", "CRIPTO"];
 
 // Seed inicial — carregado na tabela settings na migração da Fase 1, não usado direto em produção.
+// Casing exato como gravado em asset_snapshots.ticker — a busca é
+// case-sensitive (ver grupoDe/tipoDe), então precisa bater com o que a
+// tela usa (Title Case pros nomes de conta, upper case nos tickers de bolsa).
+// Reclassificação de 2026-09: bucket "Congelado" descontinuado — MTRE3
+// virou Crescimento; TD Inter, BTC, UNI e as ações fracionadas EUA
+// viraram Reserva (ver registro-investimentos.md / saldo-mensal-por-ativo).
 export const ASSET_GROUP_SEED = {
-  "COFRINHO MP": "RESERVA", "BUTIÁ FIC FIRF": "RESERVA", "INTER FIRF": "RESERVA",
-  "CDB INTER": "LIQUIDEZ", "POUPANÇA": "LIQUIDEZ",
-  "WRLD11": "CRESCIMENTO", "NASD11": "CRESCIMENTO", "QQQI11": "CRESCIMENTO", "ITSA4": "CRESCIMENTO",
+  "WRLD11": "CRESCIMENTO", "NASD11": "CRESCIMENTO", "QQQI11": "CRESCIMENTO", "ITSA4": "CRESCIMENTO", "MTRE3": "CRESCIMENTO", "BTC": "CRESCIMENTO", "UNI": "CRESCIMENTO",
+  "Cofrinho MP": "RESERVA", "Butiá FIC FIRF": "RESERVA", "Inter FIRF": "RESERVA", "TD Inter": "RESERVA",
+  "AAPL": "RESERVA", "MSFT": "RESERVA", "GOOG": "RESERVA", "AMZN": "RESERVA", "META": "RESERVA", "NVDA": "RESERVA", "TSLA": "RESERVA", "JPM": "RESERVA", "BAC": "RESERVA", "C": "RESERVA", "GS": "RESERVA", "MS": "RESERVA", "WFC": "RESERVA", "HSBC": "RESERVA",
+  "CDB Inter (Porquinho)": "LIQUIDEZ", "Poupança": "LIQUIDEZ",
 };
 export const ASSET_TIPO_SEED = {
-  "COFRINHO MP": "RENDA_FIXA", "BUTIÁ FIC FIRF": "RENDA_FIXA", "INTER FIRF": "RENDA_FIXA", "TD INTER": "RENDA_FIXA",
-  "CDB INTER": "CAIXA", "POUPANÇA": "CAIXA",
+  "Cofrinho MP": "RENDA_FIXA", "Butiá FIC FIRF": "RENDA_FIXA", "Inter FIRF": "RENDA_FIXA", "TD Inter": "RENDA_FIXA",
+  "CDB Inter (Porquinho)": "CAIXA", "Poupança": "CAIXA",
   "WRLD11": "ETF", "NASD11": "ETF", "QQQI11": "ETF",
   "ITSA4": "ACOES_BR", "MTRE3": "ACOES_BR",
   "BTC": "CRIPTO", "UNI": "CRIPTO",
+  "AAPL": "BOND_USD", "MSFT": "BOND_USD", "GOOG": "BOND_USD", "AMZN": "BOND_USD", "META": "BOND_USD", "NVDA": "BOND_USD", "TSLA": "BOND_USD", "JPM": "BOND_USD", "BAC": "BOND_USD", "C": "BOND_USD", "GS": "BOND_USD", "MS": "BOND_USD", "WFC": "BOND_USD", "HSBC": "BOND_USD",
+};
+
+// Teto MEI — muda por ano (PLP 60/2025, PLP 67/2025 etc.), por isso vira
+// configuração editável em vez de constante fixa. Ver Notas/MEI.
+export const TETO_MEI_SEED = {
+  "2026": { limite: 81000, tolerancia: 97200 },
 };
 
 export const grupoDe = (assetGroupMap, nome) => assetGroupMap[nome] || "CONGELADO";

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { parseNFSeXML, validarNFSe, gerarHashDedup } from '../lib/nfse-parser';
-import { supabase } from '../data/supabaseClient';
+import { existeNFSe, salvarNFSe } from '../data/nfse.js';
 import { useAuth } from '../data/AuthContext';
 
 export function NFSeUpload() {
@@ -57,36 +57,15 @@ export function NFSeUpload() {
       const hash = gerarHashDedup(nfse);
 
       // Verificar se já existe
-      const { data: existente } = await supabase
-        .from('nfse')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('hash_dedup', hash)
-        .single();
-
-      if (existente) {
+      const jaExiste = await existeNFSe(hash);
+      if (jaExiste) {
         setErroUpload('Esta NFS-e já foi importada anteriormente');
         setStep('preview');
         return;
       }
 
       // Inserir na fila de revisão
-      const { error } = await supabase
-        .from('nfse')
-        .insert({
-          user_id: user.id,
-          numero: nfse.numero,
-          chave: nfse.chave,
-          competencia: nfse.competencia,
-          valor: nfse.valor,
-          tomador: nfse.tomador,
-          descricao_servico: nfse.descricaoServico,
-          status: 'pendente_revisao',
-          hash_dedup: hash,
-          raw_xml: nfse.raw,
-        });
-
-      if (error) throw error;
+      await salvarNFSe({ ...nfse, hashDedup: hash });
 
       setMensagem('NFS-e adicionada à fila de revisão!');
       setStep('done');
