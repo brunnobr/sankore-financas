@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   BarChart, Bar, LineChart, Line, AreaChart, Area, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Cell, Legend,
+  ResponsiveContainer, Cell,
 } from "recharts";
 import { Landmark, PiggyBank, Wallet, Percent } from "lucide-react";
 import { loadMonths } from "../data/investments.js";
@@ -39,6 +39,27 @@ function RoscaDefs({ dados, idKey, idPrefix }) {
         <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#000" floodOpacity="0.35" />
       </filter>
     </defs>
+  );
+}
+
+function LegendaComposicao({ dados, total, idKey }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12.5, minWidth: 160 }}>
+      <div>
+        <div style={{ fontSize: 11, color: "var(--ink-faint)" }}>Total investido</div>
+        <div style={{ fontSize: 18, fontWeight: 700 }}>{brl(total)}</div>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {dados.map((d) => (
+          <div key={d[idKey]} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ width: 9, height: 9, borderRadius: "50%", background: d.cor, flexShrink: 0 }} />
+            <span style={{ flex: 1 }}>{d.label}</span>
+            <span style={{ color: "var(--ink-faint)", fontVariantNumeric: "tabular-nums" }}>{pct(d.pct, 1)}</span>
+            <span style={{ fontWeight: 600, minWidth: 78, textAlign: "right" }}>{brl(d.valor)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -248,28 +269,32 @@ export default function Investimentos() {
 
       <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
         <Panel title="Composição por função" style={{ flex: 1, minWidth: 300 }}>
-          <ResponsiveContainer width="100%" height={220}>
-            <PieChart>
-              <RoscaDefs dados={grupos} idKey="grupo" idPrefix="grad-fn" />
-              <Pie data={grupos} dataKey="valor" nameKey="label" innerRadius={55} outerRadius={85} paddingAngle={4} cornerRadius={8} filter="url(#rosca-sombra)" stroke="none">
-                {grupos.map((g) => <Cell key={g.grupo} fill={`url(#grad-fn-${g.grupo})`} />)}
-              </Pie>
-              <Tooltip formatter={(v) => brl(v)} />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
+          <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+            <ResponsiveContainer width="100%" height={220} style={{ flex: 2, minWidth: 200 }}>
+              <PieChart>
+                <RoscaDefs dados={grupos} idKey="grupo" idPrefix="grad-fn" />
+                <Pie data={grupos} dataKey="valor" nameKey="label" innerRadius={55} outerRadius={85} paddingAngle={4} cornerRadius={8} filter="url(#rosca-sombra)" stroke="none">
+                  {grupos.map((g) => <Cell key={g.grupo} fill={`url(#grad-fn-${g.grupo})`} />)}
+                </Pie>
+                <Tooltip formatter={(v) => brl(v)} />
+              </PieChart>
+            </ResponsiveContainer>
+            <LegendaComposicao dados={grupos} total={investido(assetGroupMap, latest)} idKey="grupo" />
+          </div>
         </Panel>
         <Panel title="Composição por tipo" style={{ flex: 1, minWidth: 300 }}>
-          <ResponsiveContainer width="100%" height={220}>
-            <PieChart>
-              <RoscaDefs dados={tipos} idKey="tipo" idPrefix="grad-tp" />
-              <Pie data={tipos} dataKey="valor" nameKey="label" innerRadius={55} outerRadius={85} paddingAngle={4} cornerRadius={8} filter="url(#rosca-sombra)" stroke="none">
-                {tipos.map((t) => <Cell key={t.tipo} fill={`url(#grad-tp-${t.tipo})`} />)}
-              </Pie>
-              <Tooltip formatter={(v) => brl(v)} />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
+          <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+            <ResponsiveContainer width="100%" height={220} style={{ flex: 2, minWidth: 200 }}>
+              <PieChart>
+                <RoscaDefs dados={tipos} idKey="tipo" idPrefix="grad-tp" />
+                <Pie data={tipos} dataKey="valor" nameKey="label" innerRadius={55} outerRadius={85} paddingAngle={4} cornerRadius={8} filter="url(#rosca-sombra)" stroke="none">
+                  {tipos.map((t) => <Cell key={t.tipo} fill={`url(#grad-tp-${t.tipo})`} />)}
+                </Pie>
+                <Tooltip formatter={(v) => brl(v)} />
+              </PieChart>
+            </ResponsiveContainer>
+            <LegendaComposicao dados={tipos} total={totalDoMes(latest)} idKey="tipo" />
+          </div>
         </Panel>
       </div>
 
