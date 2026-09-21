@@ -14,7 +14,7 @@ export default function ReceitasDespesas() {
   const [transacoes, setTransacoes] = useState(null);
   const [categoriasMap, setCategoriasMap] = useState(null);
   const [erro, setErro] = useState("");
-  const [filtroCategoria, setFiltroCategoria] = useState("");
+  const [filtroCategoria, setFiltroCategoria] = useState(searchParams.get("categoria") || "");
   const [filtroBanco, setFiltroBanco] = useState("");
   const [filtroMes, setFiltroMes] = useState(searchParams.get("mes") || "");
   const [filtroTipo, setFiltroTipo] = useState(searchParams.get("tipo") || "");

@@ -8,15 +8,15 @@
    ficam null e saem do denominador do score, nunca penalizam.
    ═══════════════════════════════════════════════════════════════ */
 import {
-  clamp10, notaRentabilidade, notaConstancia, notaDiversificacao, notaLiquidez,
+  clamp10, notaRentabilidade, notaConstancia, notaDiversificacao,
   totalDoMes, caixaDoMes, tiposDoMes, gruposDoMes, retornoMes,
 } from "./returns.js";
 import { agregarTx, categoriasDespesa } from "./categorization.js";
 
 export const PESOS_SCORE = {
-  rentabilidade: 0.15, constancia: 0.10, diversificacao: 0.10, liquidez: 0.05, reserva: 0.10,
-  fluxoCaixa: 0.15, controleGastos: 0.10, exposicaoCartao: 0.15, crescimentoPatrimonial: 0.10,
-}; // soma = 1.00
+  fluxoCaixa: 0.15, controleGastos: 0.10, reserva: 0.15, constancia: 0.10, rentabilidade: 0.15,
+  diversificacao: 0.10, exposicaoCartao: 0.10, endividamento: 0.05, crescimentoPatrimonial: 0.10,
+}; // soma = 1.00 — liquidez saiu das 9 dimensões pedidas; peso redistribuído entre as demais.
 
 export const PERFIL_INVESTIDOR = {
   objetivo: "aposentadoria_longo_prazo",
@@ -50,6 +50,13 @@ function notaExposicaoCartao(parceladoFuturo, receitaMensal) {
   if (multiplo >= 1.5) return 0;
   return clamp10(10 - (multiplo - 0.5) * 10);
 }
+/* Endividamento: relaciona dívidas com patrimônio/renda — não existe
+   nenhuma fonte de dado de dívida nessa fase do app (sem cartão de
+   crédito, sem empréstimos rastreados), então fica sempre "sem dado" e
+   sai do denominador do score, igual exposicaoCartao. */
+function notaEndividamento() {
+  return null;
+}
 function notaCrescimentoPatrimonial(monthsEscopo) {
   if (!monthsEscopo || monthsEscopo.length < 2) return null;
   const serie = monthsEscopo.map((m) => totalDoMes(m));
@@ -68,15 +75,15 @@ function despesaMediaHistorica(monthsEscopo, transacoesTodas, categoriasMap) {
 
 export function calcularFinancialScore(ctx) {
   const criterios = [
-    { chave: "rentabilidade", label: "Rentabilidade", peso: PESOS_SCORE.rentabilidade, nota: notaRentabilidade(ctx.mesPct, ctx.cdiPct) },
-    { chave: "constancia", label: "Constância dos aportes", peso: PESOS_SCORE.constancia, nota: notaConstancia(ctx.months || []) },
-    { chave: "diversificacao", label: "Diversificação", peso: PESOS_SCORE.diversificacao, nota: notaDiversificacao(ctx.tiposArr || []) },
-    { chave: "liquidez", label: "Liquidez", peso: PESOS_SCORE.liquidez, nota: notaLiquidez(ctx.pctCaixa) },
-    { chave: "reserva", label: "Reserva", peso: PESOS_SCORE.reserva, nota: notaReservaPersonalizada(ctx.reservaAtual, ctx.reservaAlvo) },
     { chave: "fluxoCaixa", label: "Fluxo de caixa", peso: PESOS_SCORE.fluxoCaixa, nota: notaFluxoCaixa(ctx.sobraPct) },
     { chave: "controleGastos", label: "Controle de gastos", peso: PESOS_SCORE.controleGastos, nota: notaControleGastos(ctx.despesaAtual, ctx.despesaAnterior) },
-    { chave: "exposicaoCartao", label: "Exposição em cartão", peso: PESOS_SCORE.exposicaoCartao, nota: notaExposicaoCartao(ctx.parceladoFuturo, ctx.receitaMensal) },
-    { chave: "crescimentoPatrimonial", label: "Crescimento patrimonial", peso: PESOS_SCORE.crescimentoPatrimonial, nota: notaCrescimentoPatrimonial(ctx.months) },
+    { chave: "reserva", label: "Reserva", peso: PESOS_SCORE.reserva, nota: notaReservaPersonalizada(ctx.reservaAtual, ctx.reservaAlvo) },
+    { chave: "constancia", label: "Aportes", peso: PESOS_SCORE.constancia, nota: notaConstancia(ctx.months || []) },
+    { chave: "rentabilidade", label: "Investimentos", peso: PESOS_SCORE.rentabilidade, nota: notaRentabilidade(ctx.mesPct, ctx.cdiPct) },
+    { chave: "diversificacao", label: "Diversificação", peso: PESOS_SCORE.diversificacao, nota: notaDiversificacao(ctx.tiposArr || []) },
+    { chave: "exposicaoCartao", label: "Crédito", peso: PESOS_SCORE.exposicaoCartao, nota: notaExposicaoCartao(ctx.parceladoFuturo, ctx.receitaMensal) },
+    { chave: "endividamento", label: "Endividamento", peso: PESOS_SCORE.endividamento, nota: notaEndividamento() },
+    { chave: "crescimentoPatrimonial", label: "Patrimônio", peso: PESOS_SCORE.crescimentoPatrimonial, nota: notaCrescimentoPatrimonial(ctx.months) },
   ].map((c) => ({ ...c, contrib: c.nota === null ? 0 : c.nota * c.peso }));
 
   const notaFinal = criterios.reduce((s, c) => s + c.contrib, 0);
