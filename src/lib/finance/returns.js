@@ -112,7 +112,10 @@ export function retornosPorAtivo(assetGroupMap, prev, latest) {
   const ap = latest.aportes?.ativoBreakdown || {};
   const apISO = latest.aportes?.dataISO;
   const provMap = {}; (latest.proventos?.itens || []).forEach((x) => (provMap[x.t] = x.v));
-  return latest.assets.filter((a) => a.valor > 0).map((a) => {
+  // Caixa (grupo LIQUIDEZ) fica fora do retorno por ativo — mesmo
+  // critério de investido()/gruposDoMes/tiposDoMes: é dinheiro usado
+  // como conta corrente, não uma posição de investimento.
+  return latest.assets.filter((a) => a.valor > 0 && grupoDe(assetGroupMap, a.nome) !== "LIQUIDEZ").map((a) => {
     const b = antes[a.nome];
     const apv = ap[a.nome]?.valor || 0;
     const prov = provMap[a.nome] || 0;

@@ -226,7 +226,7 @@ export default function Investimentos() {
             cor={retorno.pct >= 0 ? "green" : "red"}
             rotulo={`Retorno vs ${labelMes(prev.key)}`}
             valor={pct(retorno.pct)}
-            sub={retorno.xirr ? "XIRR" : "retorno simples"}
+            sub={`${retorno.xirr ? "XIRR" : "retorno simples"} · ${retorno.rent >= 0 ? "+" : ""}${brl(retorno.rent)}`}
           />
         )}
         {diffInvestido !== null && (
@@ -235,7 +235,7 @@ export default function Investimentos() {
             cor={diffInvestido >= 0 ? "green" : "red"}
             rotulo={`Diferença vs ${labelMes(prev.key)}`}
             valor={`${diffInvestido >= 0 ? "+" : ""}${brl(diffInvestido)}`}
-            sub="valor investido"
+            sub={retorno ? `aporte ${brl(retorno.aporte)} · retorno ${retorno.rent >= 0 ? "+" : ""}${brl(retorno.rent)}` : "valor investido"}
           />
         )}
       </div>
@@ -326,7 +326,7 @@ export default function Investimentos() {
                 <td style={{ padding: "8px 4px", color: "var(--ink-faint)" }}>{GRUPO[l.grupo]?.label || l.grupo}</td>
                 <td style={{ padding: "8px 4px", textAlign: "right" }}>{brl(l.valor)}</td>
                 <td style={{ padding: "8px 4px", textAlign: "right", color: l.rendPct == null ? "var(--ink-faint)" : l.rendPct >= 0 ? "var(--credit)" : "var(--debit)" }}>
-                  {l.rendPct == null ? "—" : pct(l.rendPct)}
+                  {l.rendPct == null ? "—" : `${pct(l.rendPct)} · ${l.rendVal >= 0 ? "+" : ""}${brl(l.rendVal)}`}
                 </td>
               </tr>
             ))}

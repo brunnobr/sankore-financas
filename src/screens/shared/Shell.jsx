@@ -75,11 +75,11 @@ function AccountMenu() {
 
 const ABAS = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
-  { path: "/receitas-despesas", label: "Receitas/Despesas", icon: ArrowLeftRight },
   { path: "/investimentos", label: "Investimentos", icon: TrendingUp },
-  { path: "/importar", label: "Importar", icon: FileText },
+  { path: "/receitas-despesas", label: "Receitas/Despesas", icon: ArrowLeftRight },
   { path: "/cartao", label: "Cartão", icon: CreditCard },
   { path: "/notas", label: "Notas/MEI", icon: FileText },
+  { path: "/importar", label: "Importar", icon: FileText },
   { path: "/analytics", label: "Analytics", icon: BarChart3 },
   { path: "/forecast", label: "Forecast", icon: LineChart },
   { path: "/planner", label: "Planner", icon: Target },
