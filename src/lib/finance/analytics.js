@@ -19,13 +19,15 @@
    ═══════════════════════════════════════════════════════════════ */
 import { agregarTx, categoriasDespesa, categoriasReceita, variacaoPct } from "./categorization.js";
 import { normalizar } from "./format.js";
-import { totalDoMes, retornoMes } from "./returns.js";
+import { totalDoMes, retornoMes, investido } from "./returns.js";
 
 export const PERIODOS = [
   { value: "mes", label: "Este mês" },
+  { value: "mes-especifico", label: "Mês específico" },
   { value: "3m", label: "Últimos 3 meses" },
   { value: "6m", label: "Últimos 6 meses" },
   { value: "12m", label: "Últimos 12 meses" },
+  { value: "ano", label: "Ano" },
   { value: "custom", label: "Personalizado" },
 ];
 
@@ -40,8 +42,17 @@ const N_PERIODO = { mes: 1, "3m": 3, "6m": 6, "12m": 12 };
 /* `todasMeses` = lista ordenada ascendente de "YYYY-MM" com QUALQUER
    dado (transação ou fechamento de investimento) — a mesma união já
    usada em Dashboard.jsx pra não esconder mês com só um dos dois. */
-export function resolverPeriodo(tipo, todasMeses, customIni, customFim) {
+export function resolverPeriodo(tipo, todasMeses, customIni, customFim, mesEspecifico, ano) {
   if (!todasMeses.length) return [];
+  // Mês específico e Ano são recortes diretos de todasMeses (só meses
+  // com dado real) — nunca inventam um mês vazio que o usuário ainda
+  // não fechou/importou.
+  if (tipo === "mes-especifico") {
+    return mesEspecifico && todasMeses.includes(mesEspecifico) ? [mesEspecifico] : [];
+  }
+  if (tipo === "ano") {
+    return ano ? todasMeses.filter((ym) => ym.slice(0, 4) === String(ano)) : [];
+  }
   if (tipo === "custom") {
     if (!customIni || !customFim || customIni > customFim) return [];
     const meses = [];
@@ -117,7 +128,9 @@ export function seriePatrimonial(months, assetGroupMap, meses) {
       const r = retornoMes(assetGroupMap, prev, m);
       return {
         mes: m.key.slice(0, 7),
-        patrimonio: totalDoMes(m),
+        // investido, não totalDoMes: caixa (CDB/poupança usado como
+        // conta corrente) fica fora da evolução patrimonial.
+        patrimonio: investido(assetGroupMap, m),
         aporte: r?.aporte ?? m.aportes?.total ?? 0,
         rentabilidade: r?.rent ?? null,
       };

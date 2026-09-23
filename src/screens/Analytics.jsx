@@ -55,6 +55,8 @@ export default function Analytics() {
   const [compararCom, setCompararCom] = useState("anterior");
   const [customIni, setCustomIni] = useState("");
   const [customFim, setCustomFim] = useState("");
+  const [mesEspecifico, setMesEspecifico] = useState("");
+  const [anoEscolhido, setAnoEscolhido] = useState("");
   const [filtroBanco, setFiltroBanco] = useState("");
   const [filtroCategoria, setFiltroCategoria] = useState("");
   const [filtroTipo, setFiltroTipo] = useState("");
@@ -92,7 +94,19 @@ export default function Analytics() {
   const bancos = useMemo(() => pronto ? [...new Set(transacoes.map((t) => t.banco).filter(Boolean))].sort() : [], [pronto, transacoes]);
   const categorias = useMemo(() => categoriasMap ? Object.keys(categoriasMap).sort() : [], [categoriasMap]);
 
-  const mesesSelecionados = useMemo(() => resolverPeriodo(periodo, todasMeses, customIni, customFim), [periodo, todasMeses, customIni, customFim]);
+  const anosDisponiveis = useMemo(() => [...new Set(todasMeses.map((ym) => ym.slice(0, 4)))].sort().reverse(), [todasMeses]);
+
+  // Ao trocar pra "Mês específico"/"Ano", já pré-seleciona o mais recente
+  // disponível em vez de deixar o combo vazio — evita o usuário cair na
+  // tela "sem dados" só por ainda não ter escolhido nada.
+  useEffect(() => {
+    if (periodo === "mes-especifico" && !mesEspecifico && todasMeses.length) setMesEspecifico(todasMeses[todasMeses.length - 1]);
+    if (periodo === "ano" && !anoEscolhido && anosDisponiveis.length) setAnoEscolhido(anosDisponiveis[0]);
+  }, [periodo, todasMeses, anosDisponiveis]);
+  const mesesSelecionados = useMemo(
+    () => resolverPeriodo(periodo, todasMeses, customIni, customFim, mesEspecifico, anoEscolhido),
+    [periodo, todasMeses, customIni, customFim, mesEspecifico, anoEscolhido]
+  );
   const mesesComparacao = useMemo(() => resolverComparacao(compararCom, mesesSelecionados, todasMeses), [compararCom, mesesSelecionados, todasMeses]);
 
   const analise = useMemo(() => {
@@ -111,7 +125,7 @@ export default function Analytics() {
     const monthsSelecionados = months.filter((m) => mesesSelecionados.includes(m.key.slice(0, 7)));
     const ultimoMesInvest = monthsSelecionados[monthsSelecionados.length - 1] || null;
     const grupos = ultimoMesInvest ? gruposDoMes(assetGroupMap, ultimoMesInvest) : [];
-    const tipos = ultimoMesInvest ? tiposDoMes(assetTipoMap, ultimoMesInvest) : [];
+    const tipos = ultimoMesInvest ? tiposDoMes(assetTipoMap, ultimoMesInvest, assetGroupMap) : [];
     const reservaGrupo = grupos.find((g) => g.grupo === "RESERVA");
     const reservaAtual = reservaGrupo ? reservaGrupo.valor : 0;
 
@@ -131,8 +145,10 @@ export default function Analytics() {
     const principalFonte = receitasVar[0];
     const indicadores = indicadoresFinanceiros({
       agAtual,
-      patrimonioAtual: ultimoMesInvest ? investido(assetGroupMap, ultimoMesInvest) + caixaDoMes(assetGroupMap, ultimoMesInvest) : null,
-      patrimonioAnterior: ultimoMesInvestAnterior ? investido(assetGroupMap, ultimoMesInvestAnterior) + caixaDoMes(assetGroupMap, ultimoMesInvestAnterior) : null,
+      // investido, não +caixaDoMes: CDB/poupança aqui é usado como
+      // conta corrente, não patrimônio investido — fica fora do cálculo.
+      patrimonioAtual: ultimoMesInvest ? investido(assetGroupMap, ultimoMesInvest) : null,
+      patrimonioAnterior: ultimoMesInvestAnterior ? investido(assetGroupMap, ultimoMesInvestAnterior) : null,
       reservaAtual,
       despesaMediaMensal: mediaDespesa,
       principalFontePct: principalFonte ? principalFonte.pct : null,
@@ -142,7 +158,7 @@ export default function Analytics() {
     const idxIndicadorPatrim = indicadores.findIndex((i) => i.chave === "crescimentoPatrimonial");
     const indPatrim = indicadores[idxIndicadorPatrim];
     const patrimonioDelta = (!indPatrim.semDados && ultimoMesInvest)
-      ? { total: investido(assetGroupMap, ultimoMesInvest) + caixaDoMes(assetGroupMap, ultimoMesInvest) - (investido(assetGroupMap, ultimoMesInvestAnterior) + caixaDoMes(assetGroupMap, ultimoMesInvestAnterior)), aporte: null, valorizacao: null }
+      ? { total: investido(assetGroupMap, ultimoMesInvest) - investido(assetGroupMap, ultimoMesInvestAnterior), aporte: null, valorizacao: null }
       : null;
 
     const insights = insightsAvancados({ despesasVar, receitasRec: receitasVar, aportesHistorico: aportesHist, patrimonioDelta, agAtual });
@@ -183,6 +199,18 @@ export default function Analytics() {
           <select value={periodo} onChange={(e) => setPeriodo(e.target.value)} style={selectStyle}>
             {PERIODOS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
           </select>
+          {periodo === "mes-especifico" && (
+            <select value={mesEspecifico} onChange={(e) => setMesEspecifico(e.target.value)} style={selectStyle}>
+              <option value="" disabled>— escolha o mês —</option>
+              {[...todasMeses].reverse().map((ym) => <option key={ym} value={ym}>{labelMes(ym)}</option>)}
+            </select>
+          )}
+          {periodo === "ano" && (
+            <select value={anoEscolhido} onChange={(e) => setAnoEscolhido(e.target.value)} style={selectStyle}>
+              <option value="" disabled>— escolha o ano —</option>
+              {anosDisponiveis.map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+          )}
           {periodo === "custom" && (
             <>
               <input type="month" value={customIni} onChange={(e) => setCustomIni(e.target.value)} style={selectStyle} />

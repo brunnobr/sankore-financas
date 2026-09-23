@@ -3,7 +3,7 @@ import {
   BarChart, Bar, LineChart, Line, AreaChart, Area, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell,
 } from "recharts";
-import { Landmark, PiggyBank, Wallet, Percent } from "lucide-react";
+import { Landmark, PiggyBank, Wallet, Percent, TrendingUp, TrendingDown } from "lucide-react";
 import { loadMonths } from "../data/investments.js";
 import { getAssetGroupMap, getAssetTipoMap, updateSetting } from "../data/settings.js";
 import { GRUPO, TIPO } from "../lib/finance/taxonomy.js";
@@ -165,10 +165,11 @@ export default function Investimentos() {
   const prev = pronto && idxSelecionado != null && idxSelecionado > 0 ? months[idxSelecionado - 1] : null;
 
   const grupos = pronto && latest ? gruposDoMes(assetGroupMap, latest) : [];
-  const tipos = pronto && latest ? tiposDoMes(assetTipoMap, latest) : [];
+  const tipos = pronto && latest ? tiposDoMes(assetTipoMap, latest, assetGroupMap) : [];
   const linhasTodas = pronto && latest ? retornosPorAtivo(assetGroupMap, prev, latest) : [];
   const linhas = filtroGrupo === "TODOS" ? linhasTodas : linhasTodas.filter((l) => l.grupo === filtroGrupo);
   const retorno = pronto && latest ? retornoMes(assetGroupMap, prev, latest) : null;
+  const diffInvestido = pronto && latest && prev ? investido(assetGroupMap, latest) - investido(assetGroupMap, prev) : null;
 
   const evolucao = useMemo(() => {
     if (!pronto) return [];
@@ -226,6 +227,15 @@ export default function Investimentos() {
             rotulo={`Retorno vs ${labelMes(prev.key)}`}
             valor={pct(retorno.pct)}
             sub={retorno.xirr ? "XIRR" : "retorno simples"}
+          />
+        )}
+        {diffInvestido !== null && (
+          <StatCard
+            icon={diffInvestido >= 0 ? TrendingUp : TrendingDown}
+            cor={diffInvestido >= 0 ? "green" : "red"}
+            rotulo={`Diferença vs ${labelMes(prev.key)}`}
+            valor={`${diffInvestido >= 0 ? "+" : ""}${brl(diffInvestido)}`}
+            sub="valor investido"
           />
         )}
       </div>
@@ -293,7 +303,7 @@ export default function Investimentos() {
                 <Tooltip formatter={(v) => brl(v)} />
               </PieChart>
             </ResponsiveContainer>
-            <LegendaComposicao dados={tipos} total={totalDoMes(latest)} idKey="tipo" />
+            <LegendaComposicao dados={tipos} total={investido(assetGroupMap, latest)} idKey="tipo" />
           </div>
         </Panel>
       </div>

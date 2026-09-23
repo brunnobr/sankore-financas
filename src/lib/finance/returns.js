@@ -93,10 +93,14 @@ export function gruposDoMes(assetGroupMap, month) {
     .map((g) => ({ grupo: g, ...GRUPO[g], valor: acc[g], pct: inv ? (acc[g] / inv) * 100 : 0 }));
 }
 
-export function tiposDoMes(assetTipoMap, month) {
+export function tiposDoMes(assetTipoMap, month, assetGroupMap) {
   if (!month) return [];
-  const tot = totalDoMes(month), acc = {};
-  month.assets.forEach((a) => { const t = tipoDe(assetTipoMap, a.nome); acc[t] = (acc[t] || 0) + a.valor; });
+  // CAIXA (mesmos ativos do grupo LIQUIDEZ) fica fora da composição por
+  // tipo, igual já acontece em gruposDoMes — é dinheiro parado pra pagar
+  // conta do mês seguinte, não faz parte da carteira de investimentos.
+  const assetsSemCaixa = assetGroupMap ? month.assets.filter((a) => grupoDe(assetGroupMap, a.nome) !== "LIQUIDEZ") : month.assets;
+  const tot = assetsSemCaixa.reduce((s, a) => s + a.valor, 0), acc = {};
+  assetsSemCaixa.forEach((a) => { const t = tipoDe(assetTipoMap, a.nome); acc[t] = (acc[t] || 0) + a.valor; });
   return ORDEM_TIPO.filter((t) => acc[t] !== undefined)
     .map((t) => ({ tipo: t, ...TIPO[t], valor: acc[t], pct: tot ? (acc[t] / tot) * 100 : 0 }))
     .sort((a, b) => b.valor - a.valor);

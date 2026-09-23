@@ -9,7 +9,7 @@
    ═══════════════════════════════════════════════════════════════ */
 import {
   clamp10, notaRentabilidade, notaConstancia, notaDiversificacao,
-  totalDoMes, caixaDoMes, tiposDoMes, gruposDoMes, retornoMes,
+  totalDoMes, caixaDoMes, tiposDoMes, gruposDoMes, retornoMes, investido,
 } from "./returns.js";
 import { agregarTx, categoriasDespesa } from "./categorization.js";
 
@@ -57,9 +57,12 @@ function notaExposicaoCartao(parceladoFuturo, receitaMensal) {
 function notaEndividamento() {
   return null;
 }
-function notaCrescimentoPatrimonial(monthsEscopo) {
+function notaCrescimentoPatrimonial(monthsEscopo, assetGroupMap) {
   if (!monthsEscopo || monthsEscopo.length < 2) return null;
-  const serie = monthsEscopo.map((m) => totalDoMes(m));
+  // Usa "investido" (exclui caixa) — o CDB/poupança aqui funciona como
+  // conta corrente (dinheiro entra e sai o mês inteiro), então não é
+  // patrimônio que cresce ou encolhe por decisão de investimento.
+  const serie = monthsEscopo.map((m) => investido(assetGroupMap, m));
   const variacoes = [];
   for (let i = 1; i < serie.length; i++) if (serie[i - 1] > 0) variacoes.push((serie[i] - serie[i - 1]) / serie[i - 1] * 100);
   if (!variacoes.length) return null;
@@ -83,7 +86,7 @@ export function calcularFinancialScore(ctx) {
     { chave: "diversificacao", label: "Diversificação", peso: PESOS_SCORE.diversificacao, nota: notaDiversificacao(ctx.tiposArr || []) },
     { chave: "exposicaoCartao", label: "Crédito", peso: PESOS_SCORE.exposicaoCartao, nota: notaExposicaoCartao(ctx.parceladoFuturo, ctx.receitaMensal) },
     { chave: "endividamento", label: "Endividamento", peso: PESOS_SCORE.endividamento, nota: notaEndividamento() },
-    { chave: "crescimentoPatrimonial", label: "Patrimônio", peso: PESOS_SCORE.crescimentoPatrimonial, nota: notaCrescimentoPatrimonial(ctx.months) },
+    { chave: "crescimentoPatrimonial", label: "Patrimônio", peso: PESOS_SCORE.crescimentoPatrimonial, nota: notaCrescimentoPatrimonial(ctx.months, ctx.assetGroupMap) },
   ].map((c) => ({ ...c, contrib: c.nota === null ? 0 : c.nota * c.peso }));
 
   const notaFinal = criterios.reduce((s, c) => s + c.contrib, 0);
@@ -117,9 +120,9 @@ export function montarContextoMes({ months, idxMes, assetGroupMap, assetTipoMap,
   const reservaAlvo = despesaMedia != null ? despesaMedia * PERFIL_INVESTIDOR.mesesReservaAlvo : null;
 
   return {
-    latest, prev, months: escopoMeses,
+    latest, prev, months: escopoMeses, assetGroupMap,
     mesPct: mes?.pct ?? null, cdiPct: latest.benchmarks?.CDI?.valor ?? null,
-    tiposArr: tiposDoMes(assetTipoMap, latest), gruposArr: grupos,
+    tiposArr: tiposDoMes(assetTipoMap, latest, assetGroupMap), gruposArr: grupos,
     ag, agAnt, despesasCat, despesasCatAnt,
     pctCaixa, reservaAtual, reservaAlvo, despesaMediaHist: despesaMedia,
     sobraPct: ag.receita ? (ag.sobra / ag.receita) * 100 : null,
@@ -146,16 +149,16 @@ function regraRentabilidadeVsCDI(ctx) {
 }
 function regraRecordePatrimonial(ctx) {
   if (!ctx.months?.length) return null;
-  const totais = ctx.months.map((m) => totalDoMes(m));
+  const totais = ctx.months.map((m) => investido(ctx.assetGroupMap, m));
   const atual = totais[totais.length - 1];
   const max = Math.max(...totais);
-  if (atual >= max && totais.length > 1) return criarInsight("Conquista", "patrimonio", "baixa", "Novo recorde de patrimônio", `Patrimônio total atingiu ${atual.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}, o maior valor do histórico.`);
+  if (atual >= max && totais.length > 1) return criarInsight("Conquista", "patrimonio", "baixa", "Novo recorde de valor investido", `Valor investido atingiu ${atual.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}, o maior valor do histórico.`);
   return null;
 }
 function regraQuedaPatrimonial(ctx) {
   if (!ctx.prev) return null;
-  const totAnt = totalDoMes(ctx.prev), totAtual = totalDoMes(ctx.latest);
-  if (totAtual < totAnt) return criarInsight("Risco", "patrimonio", "alta", "Patrimônio caiu no mês", `Patrimônio total caiu de ${totAnt.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} para ${totAtual.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}.`);
+  const totAnt = investido(ctx.assetGroupMap, ctx.prev), totAtual = investido(ctx.assetGroupMap, ctx.latest);
+  if (totAtual < totAnt) return criarInsight("Risco", "patrimonio", "alta", "Valor investido caiu no mês", `Valor investido caiu de ${totAnt.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} para ${totAtual.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}.`);
   return null;
 }
 function regraAporteAbaixoDoPadrao(ctx) {
