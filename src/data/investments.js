@@ -12,6 +12,24 @@ async function uid() {
   return data.user.id;
 }
 
+/* Data representativa do mês pro XIRR (retornoMes em returns.js trata o
+   aporte do mês como um fluxo de caixa único). Cada ativo no breakdown
+   agora guarda sua própria dataISO (corrige o bug de uma gravação
+   sobrescrever a data de outro ativo do mesmo mês) — então a data do mês
+   vira a média ponderada pelo valor de cada aporte, não mais "a última
+   data digitada". Com 1 ativo no mês (caso comum) dá exatamente a mesma
+   data de sempre. */
+function dataRepresentativa(breakdown, mesFallback) {
+  const entradas = Object.values(breakdown).filter((a) => a.valor > 0);
+  if (!entradas.length) return mesFallback;
+  const totalValor = entradas.reduce((s, a) => s + a.valor, 0);
+  const msMedio = entradas.reduce((s, a) => {
+    const t = new Date(a.dataISO || mesFallback).getTime();
+    return s + t * (a.valor / totalValor);
+  }, 0);
+  return new Date(msMedio).toISOString().slice(0, 10);
+}
+
 export async function loadMonths() {
   const userId = await uid();
   const [snaps, contribs, divs, benchs] = await Promise.all([
@@ -77,12 +95,41 @@ export async function salvarAporteAtivo({ ticker, mes, valor, dataISO }) {
     .eq("month", mes)
     .maybeSingle();
   if (e1) throw e1;
-  const breakdown = { ...(existente?.breakdown || {}), [ticker]: { valor: Number(valor) } };
+  const breakdown = { ...(existente?.breakdown || {}), [ticker]: { valor: Number(valor), dataISO: dataISO || mes } };
   const total = Object.values(breakdown).reduce((s, a) => s + (Number(a.valor) || 0), 0);
   const { error } = await supabase.from("contributions").upsert(
-    { user_id: userId, month: mes, total, data_iso: dataISO || mes, origem: "manual", breakdown },
+    { user_id: userId, month: mes, total, data_iso: dataRepresentativa(breakdown, mes), origem: "manual", breakdown },
     { onConflict: "user_id,month" }
   );
+  if (error) throw error;
+}
+
+/* Remove um ativo do aporte do mês (corrige lançamento feito por engano).
+   Se era o único ativo do mês, apaga a linha inteira em vez de deixar um
+   total zerado órfão. */
+export async function excluirAporteAtivo({ ticker, mes }) {
+  const userId = await uid();
+  const { data: existente, error: e1 } = await supabase
+    .from("contributions")
+    .select("breakdown")
+    .eq("user_id", userId)
+    .eq("month", mes)
+    .maybeSingle();
+  if (e1) throw e1;
+  if (!existente) return;
+  const breakdown = { ...(existente.breakdown || {}) };
+  delete breakdown[ticker];
+  if (Object.keys(breakdown).length === 0) {
+    const { error } = await supabase.from("contributions").delete().eq("user_id", userId).eq("month", mes);
+    if (error) throw error;
+    return;
+  }
+  const total = Object.values(breakdown).reduce((s, a) => s + (Number(a.valor) || 0), 0);
+  const { error } = await supabase
+    .from("contributions")
+    .update({ total, data_iso: dataRepresentativa(breakdown, mes), breakdown })
+    .eq("user_id", userId)
+    .eq("month", mes);
   if (error) throw error;
 }
 
@@ -103,11 +150,13 @@ export async function salvarAporteNotaCorretagem({ mes, dataISO, notaNumero, ite
   const breakdown = { ...(existente?.breakdown || {}) };
   for (const it of itens) {
     const anterior = Number(breakdown[it.ticker]?.valor) || 0;
-    breakdown[it.ticker] = { valor: Number((anterior + it.valor).toFixed(2)), cotas: it.quantidade, preco: it.preco };
+    // ponytail: duas notas no mesmo ativo/mês ficam com a data da última lançada — raro (mais de uma nota
+    // pro mesmo ativo no mês), upgrade pra média ponderada por nota se isso passar a acontecer de verdade.
+    breakdown[it.ticker] = { valor: Number((anterior + it.valor).toFixed(2)), cotas: it.quantidade, preco: it.preco, dataISO };
   }
   const total = Object.values(breakdown).reduce((s, a) => s + (Number(a.valor) || 0), 0);
   const { error } = await supabase.from("contributions").upsert(
-    { user_id: userId, month: mes, total, data_iso: dataISO, origem: "nota_corretagem", nota_numero: notaNumero, breakdown, taxas: taxas || [] },
+    { user_id: userId, month: mes, total, data_iso: dataRepresentativa(breakdown, mes), origem: "nota_corretagem", nota_numero: notaNumero, breakdown, taxas: taxas || [] },
     { onConflict: "user_id,month" }
   );
   if (error) throw error;

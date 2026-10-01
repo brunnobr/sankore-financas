@@ -69,7 +69,7 @@ function notaCrescimentoPatrimonial(monthsEscopo, assetGroupMap) {
   const media = variacoes.reduce((s, v) => s + v, 0) / variacoes.length;
   return clamp10(5 + media * 2);
 }
-function despesaMediaHistorica(monthsEscopo, transacoesTodas, categoriasMap) {
+export function despesaMediaHistorica(monthsEscopo, transacoesTodas, categoriasMap) {
   const janela = (monthsEscopo || []).slice(-6);
   const valores = janela.map((m) => agregarTx(transacoesTodas.filter((t) => t.data.slice(0, 7) === m.key.slice(0, 7)), categoriasMap).despesa);
   if (!valores.length) return null;

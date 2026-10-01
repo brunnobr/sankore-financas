@@ -10,6 +10,7 @@ import Importar from "./screens/Importar.jsx";
 import Configuracoes from "./screens/Configuracoes.jsx";
 import NotasMEI from "./screens/NotasMEI.jsx";
 import Analytics from "./screens/Analytics.jsx";
+import Forecast from "./screens/Forecast.jsx";
 
 const TITULOS = {
   "/": "Dashboard",
@@ -56,7 +57,7 @@ function AppShell() {
         <Route path="/cartao" element={<Placeholder titulo="Cartão" />} />
         <Route path="/notas" element={<Pagina titulo={TITULOS["/notas"]}><NotasMEI /></Pagina>} />
         <Route path="/analytics" element={<Pagina titulo={TITULOS["/analytics"]}><Analytics /></Pagina>} />
-        <Route path="/forecast" element={<Placeholder titulo="Forecast" />} />
+        <Route path="/forecast" element={<Pagina titulo={TITULOS["/forecast"]}><Forecast /></Pagina>} />
         <Route path="/planner" element={<Placeholder titulo="Planner" />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

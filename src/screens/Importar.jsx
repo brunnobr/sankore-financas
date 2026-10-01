@@ -5,7 +5,7 @@ import { extrairLinhasPdf } from "../lib/import/pdfText.js";
 import { parseNotaCorretagem } from "../lib/import/parsers/notaCorretagem.js";
 import { loadRegrasUsuario, salvarRegraCategorizacao, importarTransacoes, registrarImportLog, loadTransacoes, renomearConta } from "../data/transactions.js";
 import { getCategoriasMap, getPalavrasCategoria, getAliasAtivos, salvarAliasAtivo } from "../data/settings.js";
-import { loadMonths, salvarSnapshotAtivo, salvarAporteAtivo, salvarAporteNotaCorretagem, extrairSaldosDePrint } from "../data/investments.js";
+import { loadMonths, salvarSnapshotAtivo, salvarAporteAtivo, excluirAporteAtivo, salvarAporteNotaCorretagem, extrairSaldosDePrint } from "../data/investments.js";
 import { normalizar, brl, formatarDataBR, labelMes } from "../lib/finance/format.js";
 import { Panel } from "./shared/ui.jsx";
 import { NFSeUpload } from "../components/NFSeUpload";
@@ -62,8 +62,13 @@ function AtualizarSaldoForm({ tickers, onSalvo }) {
           <input type="number" step="0.01" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" style={{ padding: "6px 8px", border: "1px solid var(--rule)", borderRadius: 6, width: 140 }} />
         </div>
         <button type="submit" disabled={salvando} style={{ padding: "8px 16px", background: "var(--accent)", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600 }}>
-          {salvando ? "Salvando…" : "Salvar"}
+          {salvando ? "Salvando…" : editando ? "Salvar alteração" : "Salvar"}
         </button>
+        {editando && (
+          <button type="button" onClick={onCancelar} style={{ padding: "8px 16px", background: "transparent", color: "var(--ink-faint)", border: "1px solid var(--rule)", borderRadius: 8, cursor: "pointer" }}>
+            Cancelar
+          </button>
+        )}
       </form>
       {erro && <p style={{ color: "var(--debit)", marginBottom: 0, marginTop: 8 }}>{erro}</p>}
     </Panel>
@@ -203,7 +208,7 @@ function ImportarCorretagemForm({ tickers, onSalvo }) {
   );
 }
 
-function RegistrarAporteForm({ tickers, onSalvo }) {
+function RegistrarAporteForm({ tickers, onSalvo, editando, onCancelar }) {
   const hoje = new Date().toISOString().slice(0, 10);
   const [ticker, setTicker] = useState("");
   const [mes, setMes] = useState(hoje.slice(0, 7));
@@ -211,6 +216,14 @@ function RegistrarAporteForm({ tickers, onSalvo }) {
   const [data, setData] = useState(hoje);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+
+  useEffect(() => {
+    if (!editando) return;
+    setTicker(editando.ticker);
+    setMes(editando.mes.slice(0, 7));
+    setValor(String(editando.valor));
+    setData(editando.dataISO || editando.mes);
+  }, [editando]);
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -222,6 +235,7 @@ function RegistrarAporteForm({ tickers, onSalvo }) {
       setTicker("");
       setValor("");
       onSalvo();
+      onCancelar?.();
     } catch (e2) {
       setErro(e2.message || "Erro ao salvar aporte.");
     } finally {
@@ -230,7 +244,7 @@ function RegistrarAporteForm({ tickers, onSalvo }) {
   }
 
   return (
-    <Panel title="Registrar aporte por ativo">
+    <Panel title={editando ? `Editando aporte — ${editando.ticker} (${labelMes(editando.mes)})` : "Registrar aporte por ativo"}>
       <p style={{ fontSize: 13, color: "var(--ink-faint)", marginTop: -8, marginBottom: 12 }}>
         Da nota de corretagem ou do extrato — quanto entrou em qual ativo no mês.
       </p>
@@ -273,6 +287,77 @@ function fileParaBase64(file) {
    Function chama a API da Claude e devolve os pares ativo/valor, que
    caem numa fila de revisão (igual ao import de extrato) antes de
    gravar em asset_snapshots. Movido de Investimentos.jsx. */
+function LancamentosAporte({ months, onEditar, onExcluido }) {
+  const [excluindo, setExcluindo] = useState(null);
+
+  const linhas = useMemo(() => {
+    const out = [];
+    for (const m of months) {
+      const bd = m.aportes?.ativoBreakdown;
+      if (!bd) continue;
+      for (const [ticker, info] of Object.entries(bd)) {
+        out.push({ mes: m.key, ticker, valor: Number(info.valor) || 0, dataISO: info.dataISO, origem: m.aportes.origem });
+      }
+    }
+    return out.sort((a, b) => b.mes.localeCompare(a.mes) || a.ticker.localeCompare(b.ticker));
+  }, [months]);
+
+  async function excluir(l) {
+    if (!window.confirm(`Excluir o aporte de ${l.ticker} em ${labelMes(l.mes)} (${brl(l.valor)})?`)) return;
+    setExcluindo(`${l.mes}:${l.ticker}`);
+    try {
+      await excluirAporteAtivo({ ticker: l.ticker, mes: l.mes });
+      onExcluido();
+    } finally {
+      setExcluindo(null);
+    }
+  }
+
+  if (!linhas.length) return null;
+
+  return (
+    <Panel title="Lançamentos de aporte">
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead>
+            <tr style={{ textAlign: "left", borderBottom: "1px solid var(--rule)", color: "var(--ink-faint)" }}>
+              <th style={{ padding: "6px 4px" }}>Mês</th>
+              <th style={{ padding: "6px 4px" }}>Ativo</th>
+              <th style={{ padding: "6px 4px", textAlign: "right" }}>Valor</th>
+              <th style={{ padding: "6px 4px" }}>Data</th>
+              <th style={{ padding: "6px 4px" }}>Origem</th>
+              <th style={{ padding: "6px 4px" }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {linhas.map((l) => (
+              <tr key={`${l.mes}:${l.ticker}`} style={{ borderBottom: "1px solid var(--rule)" }}>
+                <td style={{ padding: "8px 4px" }}>{labelMes(l.mes)}</td>
+                <td style={{ padding: "8px 4px" }}>{l.ticker}</td>
+                <td style={{ padding: "8px 4px", textAlign: "right" }}>{brl(l.valor)}</td>
+                <td style={{ padding: "8px 4px" }}>{l.dataISO ? formatarDataBR(l.dataISO) : "—"}</td>
+                <td style={{ padding: "8px 4px", color: "var(--ink-faint)" }}>{l.origem === "nota_corretagem" ? "Nota" : "Manual"}</td>
+                <td style={{ padding: "8px 4px", whiteSpace: "nowrap" }}>
+                  <button onClick={() => onEditar(l)} style={{ padding: "4px 8px", background: "transparent", border: "1px solid var(--rule)", borderRadius: 6, cursor: "pointer", marginRight: 6 }}>
+                    Editar
+                  </button>
+                  <button
+                    onClick={() => excluir(l)}
+                    disabled={excluindo === `${l.mes}:${l.ticker}`}
+                    style={{ padding: "4px 8px", background: "transparent", color: "var(--debit)", border: "1px solid var(--rule)", borderRadius: 6, cursor: "pointer" }}
+                  >
+                    {excluindo === `${l.mes}:${l.ticker}` ? "Excluindo…" : "Excluir"}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Panel>
+  );
+}
+
 function ImportarPrintForm({ tickers, onSalvo }) {
   const hoje = new Date().toISOString().slice(0, 7);
   const [mes, setMes] = useState(hoje);
@@ -424,6 +509,7 @@ export default function Importar() {
   const [nomeContaInput, setNomeContaInput] = useState("");
   const [salvandoConta, setSalvandoConta] = useState(false);
   const [investMonths, setInvestMonths] = useState([]);
+  const [editandoAporte, setEditandoAporte] = useState(null);
 
   useEffect(() => {
     Promise.all([getCategoriasMap(), getPalavrasCategoria()]).then(([c, p]) => {
@@ -639,7 +725,13 @@ export default function Importar() {
         <ImportarPrintForm tickers={tickersInvestimento} onSalvo={carregarInvestMonths} />
         <ImportarCorretagemForm tickers={tickersInvestimento} onSalvo={carregarInvestMonths} />
         <AtualizarSaldoForm tickers={tickersInvestimento} onSalvo={carregarInvestMonths} />
-        <RegistrarAporteForm tickers={tickersInvestimento} onSalvo={carregarInvestMonths} />
+        <RegistrarAporteForm
+          tickers={tickersInvestimento}
+          onSalvo={carregarInvestMonths}
+          editando={editandoAporte}
+          onCancelar={() => setEditandoAporte(null)}
+        />
+        <LancamentosAporte months={investMonths} onEditar={setEditandoAporte} onExcluido={carregarInvestMonths} />
       </div>
 
       {/* ========== NFS-e (MEI) ========== */}
