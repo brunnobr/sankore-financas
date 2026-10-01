@@ -62,13 +62,8 @@ function AtualizarSaldoForm({ tickers, onSalvo }) {
           <input type="number" step="0.01" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" style={{ padding: "6px 8px", border: "1px solid var(--rule)", borderRadius: 6, width: 140 }} />
         </div>
         <button type="submit" disabled={salvando} style={{ padding: "8px 16px", background: "var(--accent)", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600 }}>
-          {salvando ? "Salvando…" : editando ? "Salvar alteração" : "Salvar"}
+          {salvando ? "Salvando…" : "Salvar"}
         </button>
-        {editando && (
-          <button type="button" onClick={onCancelar} style={{ padding: "8px 16px", background: "transparent", color: "var(--ink-faint)", border: "1px solid var(--rule)", borderRadius: 8, cursor: "pointer" }}>
-            Cancelar
-          </button>
-        )}
       </form>
       {erro && <p style={{ color: "var(--debit)", marginBottom: 0, marginTop: 8 }}>{erro}</p>}
     </Panel>
@@ -266,8 +261,13 @@ function RegistrarAporteForm({ tickers, onSalvo, editando, onCancelar }) {
           <input type="number" step="0.01" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" style={{ padding: "6px 8px", border: "1px solid var(--rule)", borderRadius: 6, width: 140 }} />
         </div>
         <button type="submit" disabled={salvando} style={{ padding: "8px 16px", background: "var(--accent)", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600 }}>
-          {salvando ? "Salvando…" : "Salvar"}
+          {salvando ? "Salvando…" : editando ? "Salvar alteração" : "Salvar"}
         </button>
+        {editando && (
+          <button type="button" onClick={onCancelar} style={{ padding: "8px 16px", background: "transparent", color: "var(--ink-faint)", border: "1px solid var(--rule)", borderRadius: 8, cursor: "pointer" }}>
+            Cancelar
+          </button>
+        )}
       </form>
       {erro && <p style={{ color: "var(--debit)", marginBottom: 0, marginTop: 8 }}>{erro}</p>}
     </Panel>
@@ -375,9 +375,13 @@ function ImportarPrintForm({ tickers, onSalvo }) {
     setExtraindo(true);
     try {
       const imagens = await Promise.all(files.map(async (f) => ({ data: await fileParaBase64(f), mediaType: f.type || "image/jpeg" })));
-      const extraidos = await extrairSaldosDePrint(imagens);
+      const [extraidos, aliasMap] = await Promise.all([extrairSaldosDePrint(imagens), getAliasAtivos()]);
       if (!extraidos.length) { setErro("Não consegui reconhecer nenhum ativo nesses prints."); return; }
-      setItens(extraidos.map((it) => ({ ...it, incluir: true })));
+      // Mesmo problema do import de nota de corretagem: a leitura (aqui por IA, lá por
+      // parser de PDF) nunca escreve o nome do ativo igual duas vezes — resolve pelo
+      // alias já aprendido antes de gravar, senão cada print cria um ticker novo e o
+      // mês não casa com o anterior (returns.js compara por nome exato).
+      setItens(extraidos.map((it) => ({ ...it, bruto: it.nome, nome: aliasMap[it.nome] || it.nome, incluir: true })));
     } catch (e2) {
       setErro(e2.message || "Erro ao extrair os saldos.");
     } finally {
@@ -395,6 +399,11 @@ function ImportarPrintForm({ tickers, onSalvo }) {
     try {
       const incluidos = itens.filter((it) => it.incluir);
       await Promise.all(incluidos.map((it) => salvarSnapshotAtivo({ ticker: it.nome.trim(), mes: `${mes}-01`, valor: Number(it.valor) })));
+      // Se o usuário corrigiu o nome (ou o alias já tinha ajustado), guarda o alias
+      // pra próxima leitura reconhecer de primeira — mesmo padrão do import de nota.
+      await Promise.all(
+        incluidos.filter((it) => it.bruto && it.bruto !== it.nome).map((it) => salvarAliasAtivo(it.bruto, it.nome.trim()))
+      );
       setItens(null);
       onSalvo();
     } catch (e2) {
