@@ -28,13 +28,16 @@ function SemDados({ children }) {
   return <p style={{ color: "var(--ink-faint)", fontSize: 12.5, fontStyle: "italic", margin: "6px 0" }}>{children}</p>;
 }
 
-function Indicador({ rotulo, valor, variacao, invertida, cor }) {
+function Indicador({ rotulo, valor, variacao, invertida, cor, sub }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1, minWidth: 180 }}>
       <span style={{ fontSize: 12, color: "var(--ink-faint)" }}>{rotulo}</span>
       <span style={{ fontSize: 22, fontWeight: 700, color: cor || "var(--ink)" }}>{valor}</span>
-      {variacao != null && (
-        <span style={{ fontSize: 12, color: corVariacao(variacao, invertida) }}>{setaVariacao(variacao)} {pctFmt(variacao, 1)} vs. comparação</span>
+      {(variacao != null || sub) && (
+        <span style={{ fontSize: 12, display: "flex", gap: 6 }}>
+          {variacao != null && <span style={{ color: corVariacao(variacao, invertida) }}>{setaVariacao(variacao)} {pctFmt(variacao, 1)} vs. comparação</span>}
+          {sub && <span style={{ color: "var(--ink-faint)" }}>{sub}</span>}
+        </span>
       )}
     </div>
   );
@@ -248,8 +251,19 @@ export default function Analytics() {
           {/* 2. Visão financeira */}
           <Panel title="Visão financeira">
             <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginBottom: 16 }}>
-              <Indicador rotulo="Receitas" valor={brl(analise.agAtual.receita)} variacao={analise.agAnterior ? variacaoPctLocal(analise.agAtual.receita, analise.agAnterior.receita) : null} />
-              <Indicador rotulo="Despesas" valor={brl(analise.agAtual.despesa)} variacao={analise.agAnterior ? variacaoPctLocal(analise.agAtual.despesa, analise.agAnterior.despesa) : null} invertida />
+              <Indicador
+                rotulo="Receitas"
+                valor={brl(analise.agAtual.receita)}
+                variacao={analise.agAnterior ? variacaoPctLocal(analise.agAtual.receita, analise.agAnterior.receita) : null}
+                sub={mesesSelecionados.length > 1 ? `média ${mesesSelecionados.length}m: ${brl(analise.agAtual.receita / mesesSelecionados.length)}` : undefined}
+              />
+              <Indicador
+                rotulo="Despesas"
+                valor={brl(analise.agAtual.despesa)}
+                variacao={analise.agAnterior ? variacaoPctLocal(analise.agAtual.despesa, analise.agAnterior.despesa) : null}
+                invertida
+                sub={mesesSelecionados.length > 1 ? `média ${mesesSelecionados.length}m: ${brl(analise.agAtual.despesa / mesesSelecionados.length)}` : undefined}
+              />
               <Indicador rotulo="Resultado operacional" valor={brl(analise.agAtual.resultadoOperacional)} cor={analise.agAtual.resultadoOperacional >= 0 ? "var(--credit)" : "var(--debit)"} />
               <Indicador rotulo="Aportes" valor={brl(analise.agAtual.aporte)} variacao={analise.agAnterior ? variacaoPctLocal(analise.agAtual.aporte, analise.agAnterior.aporte) : null} />
             </div>
