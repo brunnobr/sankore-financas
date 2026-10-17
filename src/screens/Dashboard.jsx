@@ -5,6 +5,7 @@ import { loadTransacoes } from "../data/transactions.js";
 import { loadMonths } from "../data/investments.js";
 import { getCategoriasMap } from "../data/settings.js";
 import { agregarTx, categoriasDespesa, categoriasReceita, categoriasAporte, avaliarGastos, variacaoPct } from "../lib/finance/categorization.js";
+import { agregarPeriodo } from "../lib/finance/analytics.js";
 import { brl, labelMes } from "../lib/finance/format.js";
 import { Panel, StatCard } from "./shared/ui.jsx";
 
@@ -55,6 +56,18 @@ export default function Dashboard() {
     return agregarTx(transacoes.filter((t) => mesDe(t.data) === mesAnterior), categoriasMap);
   }, [pronto, transacoes, categoriasMap, mesAnterior]);
 
+  // Média histórica de receita/despesa — exclui o mês corrente real (não
+  // o mês selecionado no filtro) porque ele ainda está em andamento e
+  // puxaria a média pra baixo com dado incompleto.
+  const mesCorrenteReal = new Date().toISOString().slice(0, 7);
+  const mediaHist = useMemo(() => {
+    if (!pronto) return null;
+    const fechados = meses.filter((m) => m !== mesCorrenteReal);
+    if (!fechados.length) return null;
+    const ag = agregarPeriodo(transacoes, categoriasMap, fechados);
+    return { receita: ag.receita / fechados.length, despesa: ag.despesa / fechados.length, n: fechados.length };
+  }, [pronto, transacoes, categoriasMap, meses]);
+
   const despesasPorCategoria = agAtual ? categoriasDespesa(agAtual, categoriasMap) : [];
   const receitasPorCategoria = agAtual ? categoriasReceita(agAtual, categoriasMap) : [];
   const aportePorCategoria = agAtual ? categoriasAporte(agAtual, categoriasMap) : [];
@@ -91,8 +104,25 @@ export default function Dashboard() {
       </select>
 
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-        <StatCard icon={TrendingUp} cor="green" rotulo="Receita" valor={brl(agAtual.receita)} variacao={varReceita} onClick={() => navigate(`/receitas-despesas?mes=${mesAtual}&tipo=receita`)} />
-        <StatCard icon={TrendingDown} cor="red" rotulo="Despesa" valor={brl(agAtual.despesa)} variacao={varDespesa} variacaoInvertida onClick={() => navigate(`/receitas-despesas?mes=${mesAtual}&tipo=despesa`)} />
+        <StatCard
+          icon={TrendingUp}
+          cor="green"
+          rotulo="Receita"
+          valor={brl(agAtual.receita)}
+          variacao={varReceita}
+          sub={mediaHist ? `média ${mediaHist.n}m: ${brl(mediaHist.receita)}` : undefined}
+          onClick={() => navigate(`/receitas-despesas?mes=${mesAtual}&tipo=receita`)}
+        />
+        <StatCard
+          icon={TrendingDown}
+          cor="red"
+          rotulo="Despesa"
+          valor={brl(agAtual.despesa)}
+          variacao={varDespesa}
+          variacaoInvertida
+          sub={mediaHist ? `média ${mediaHist.n}m: ${brl(mediaHist.despesa)}` : undefined}
+          onClick={() => navigate(`/receitas-despesas?mes=${mesAtual}&tipo=despesa`)}
+        />
         <StatCard icon={Wallet} cor="blue" rotulo="Aporte" valor={brl(agAtual.aporte)} variacao={varAporte} onClick={() => navigate(`/receitas-despesas?mes=${mesAtual}&tipo=aporte`)} />
         <StatCard
           icon={PiggyBank}
